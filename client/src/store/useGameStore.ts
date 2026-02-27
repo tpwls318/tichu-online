@@ -1,0 +1,70 @@
+import { create } from 'zustand';
+import { io, Socket } from 'socket.io-client';
+
+// GameState interface removed or integrated if not used
+
+interface GameStore {
+  socket: Socket | null;
+  gameState: any | null;
+  roomId: string | null;
+  error: string | null;
+  connect: () => void;
+  createRoom: (nickname: string) => void;
+  joinRoom: (nickname: string, roomId: string) => void;
+  startSoloTest: (nickname: string) => void;
+  answerGrandTichu: (callGrand: boolean) => void;
+  passCards: (targetMap: { [targetId: string]: string }) => void;
+}
+
+export const useGameStore = create<GameStore>((set, get) => ({
+  socket: null,
+  gameState: null,
+  roomId: null,
+  error: null,
+
+  connect: () => {
+    if (get().socket) return;
+    
+    const socket = io('http://localhost:3001');
+    
+    socket.on('roomCreated', ({ roomId, gameState }) => {
+      set({ roomId, gameState, error: null });
+    });
+
+    socket.on('gameStateUpdate', (gameState) => {
+      set({ gameState, error: null });
+    });
+
+    socket.on('error', (msg) => {
+      set({ error: msg });
+    });
+
+    set({ socket });
+  },
+
+  createRoom: (nickname) => {
+    get().socket?.emit('createRoom', { nickname });
+  },
+
+  joinRoom: (nickname, roomId) => {
+    get().socket?.emit('joinRoom', { nickname, roomId });
+  },
+
+  startSoloTest: (nickname) => {
+    get().socket?.emit('startSoloTest', { nickname });
+  },
+
+  answerGrandTichu: (callGrand) => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('answerGrandTichu', { roomId, callGrand });
+    }
+  },
+
+  passCards: (targetMap) => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('passCards', { roomId, targetMap });
+    }
+  }
+}));
