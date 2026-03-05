@@ -7,6 +7,8 @@ export class TichuEngine {
   deck: TichuDeck;
   private remainingHands: { [playerId: string]: Card[] } = {};
   private grandTichuResponses: { [playerId: string]: boolean } = {};
+  private passCount: number = 0;
+  private finishedPlayers: string[] = [];
 
   constructor(roomId: string) {
     this.deck = new TichuDeck();
@@ -18,10 +20,13 @@ export class TichuEngine {
       lastTrick: null,
       scores: { teamA: 0, teamB: 0 },
       passStates: {},
+      receivedPasses: {},
+      cardEvent: null,
+      currentWish: null,
       history: []
     };
   }
-
+  
   addPlayer(id: string, nickname: string) {
     if (this.state.players.length >= 4) return false;
     
@@ -108,7 +113,11 @@ export class TichuEngine {
   }
 
   private completePassing() {
+    this.state.receivedPasses = {};
+    
     this.state.players.forEach(player => {
+      this.state.receivedPasses![player.id] = {};
+      
       // 1. Remove cards passed FROM this player
       const passedFromSelf = Object.values(this.state.passStates[player.id] || {});
       player.hand = player.hand.filter(c => !passedFromSelf.find(pc => pc.id === c.id));
@@ -118,6 +127,7 @@ export class TichuEngine {
         const cardToSelf = this.state.passStates[other.id]?.[player.id];
         if (cardToSelf) {
           player.hand.push(cardToSelf);
+          this.state.receivedPasses![player.id][other.id] = cardToSelf;
         }
       });
     });
@@ -130,5 +140,303 @@ export class TichuEngine {
     if (sparrowPlayer) {
       this.state.currentTurn = sparrowPlayer.seat;
     }
+  }
+
+  playCards(playerId: string, cardIds: string[], wishValue?: number) {
+    if (this.state.phase !== 'PLAYING') return false;
+    if (this.state.cardEvent?.type === 'DragonGiveaway') return false; // Block actions until dragon giveaway is resolved
+    
+    // Clear any previous events
+    this.state.cardEvent = null;
+    
+    const player = this.state.players.find(p => p.id === playerId);
+    if (!player) return false;
+
+    // Find cards in hand
+    const cardsToPlay = cardIds.map(id => player.hand.find(c => c.id === id)).filter((c): c is Card => !!c);
+    if (cardsToPlay.length !== cardIds.length) return false; // some cards not found
+
+    const combo = HandValidator.validate(cardsToPlay);
+    if (combo.type === 'Invalid') return false;
+
+    // Turn check: Normal play requires turn, otherwise MUST be a bomb played on an active trick
+    if (player.seat !== this.state.currentTurn) {
+      if (!combo.type.startsWith('Bomb')) return false;
+      if (!this.state.lastTrick) return false; // Cannot bomb an empty table out of turn
+    }
+
+    // Dog can ONLY be played if leading the trick
+    if (combo.type === 'Dog' && this.state.lastTrick !== null) return false;
+
+    let prevCombo: Combination | null = null;
+    // Compare with last trick if exists
+    if (this.state.lastTrick && this.state.lastTrick.playerId !== playerId) {
+      // Create a dummy previous combination structure to compare
+      prevCombo = {
+        type: this.state.lastTrick.type as any,
+        value: this.state.lastTrick.value,
+        length: this.state.lastTrick.cards.length,
+        cards: this.state.lastTrick.cards
+      };
+      
+      if (!HandValidator.compare(prevCombo, combo)) return false;
+    }
+
+    // Wish Enforcement Strategy (Sparrow)
+    if (this.state.currentWish !== null) {
+      const satisfiesWish = combo.cards.some(c => c.value === this.state.currentWish);
+      if (!satisfiesWish) {
+        // Did they have the ability to satisfy it?
+        if (HandValidator.canSatisfyWish(player.hand, this.state.currentWish, prevCombo)) {
+          return false; // Illegal play, they are holding out on the wish
+        }
+      }
+    }
+
+    // Success: Remove cards from hand
+    player.hand = player.hand.filter(c => !cardIds.includes(c.id));
+    
+    // Check if player went out
+    if (player.hand.length === 0 && !this.finishedPlayers.includes(player.id)) {
+      this.finishedPlayers.push(player.id);
+    }
+
+    // Handle Sparrow wish logic 
+    const hasSparrow = combo.cards.some(c => c.value === 1);
+    if (hasSparrow && wishValue !== undefined && wishValue >= 2 && wishValue <= 14) {
+      this.state.currentWish = wishValue;
+    }
+    
+    // Clear wish if the required value was played
+    if (this.state.currentWish !== null && combo.cards.some(c => c.value === this.state.currentWish)) {
+      this.state.currentWish = null;
+    }
+
+    if (combo.type === 'Dog') {
+      // Dog Logic: Pass the turn to partner immediately
+      const partner = this.state.players.find(p => p.team === player.team && p.id !== player.id);
+      
+      let nextTurnSeat = (player.seat + 1) % 4; // default to next if partner is out
+      if (partner && partner.hand.length > 0) {
+        nextTurnSeat = partner.seat;
+      } else {
+        // If partner is out, pass to next active player
+        let t = (player.seat + 1) % 4;
+        let pLoops = 4;
+        while (pLoops > 0) {
+          const nextP = this.state.players.find(x => x.seat === t);
+          if (nextP && nextP.hand.length > 0) {
+            nextTurnSeat = t;
+            break;
+          }
+          t = (t + 1) % 4;
+          pLoops--;
+        }
+      }
+
+      this.state.currentTurn = nextTurnSeat;
+      this.state.cardEvent = {
+        type: 'Dog',
+        targetSeat: nextTurnSeat,
+        duration: 2500
+      };
+      
+      this.state.lastTrick = null; // Dog starts a fresh trick for the partner
+      this.passCount = 0;
+      
+      return true; // Return immediately, trick isn't saved, it just passes lead basically
+    }
+
+    // Normal play: Update trick
+    let trickValue = combo.value;
+    if (combo.type === 'Single' && combo.cards[0].value === 16 && this.state.lastTrick) {
+      trickValue = this.state.lastTrick.value + 0.5;
+    }
+
+    this.state.lastTrick = {
+      cards: cardsToPlay,
+      playerId,
+      type: combo.type,
+      value: trickValue,
+    };
+    
+    // Reset pass count
+    this.passCount = 0;
+
+    // Force current turn to bomber before advancing, to ensure next player is relative to bomber
+    this.state.currentTurn = player.seat;
+
+    if (this.checkRoundEnd()) return true;
+
+    this.advanceTurn();
+    return true;
+  }
+
+  passTrick(playerId: string) {
+    if (this.state.phase !== 'PLAYING') return false;
+    
+    const player = this.state.players.find(p => p.id === playerId);
+    if (!player || player.seat !== this.state.currentTurn) return false;
+    
+    // Cannot pass if you are leading the trick
+    if (!this.state.lastTrick || this.state.lastTrick.playerId === playerId) return false;
+
+    // Wish Enforcement: Cannot pass if you can satisfy the wish
+    if (this.state.currentWish !== null) {
+      const prevCombo: Combination = {
+        type: this.state.lastTrick.type as any,
+        value: this.state.lastTrick.value,
+        length: this.state.lastTrick.cards.length,
+        cards: this.state.lastTrick.cards,
+      };
+      if (HandValidator.canSatisfyWish(player.hand, this.state.currentWish, prevCombo)) {
+        return false; // Illegal pass, must play the wished card
+      }
+    }
+
+    this.passCount++;
+    this.advanceTurn();
+    
+    const activePlayers = this.state.players.filter(p => p.hand.length > 0).length;
+    const trickWinner = this.state.players.find(p => p.id === this.state.lastTrick!.playerId);
+    const trickWinnerActive = trickWinner && trickWinner.hand.length > 0;
+    const passesNeeded = trickWinnerActive ? activePlayers - 1 : activePlayers;
+
+    // If enough people passed, the trick is won by the last person who played
+    if (this.passCount >= passesNeeded) {
+      const winnerId = this.state.lastTrick!.playerId;
+      const winner = this.state.players.find(p => p.id === winnerId);
+      
+      const isDragonTrick = this.state.lastTrick!.cards.some(c => c.value === 15);
+      if (isDragonTrick && winner) {
+        this.state.cardEvent = {
+          type: 'DragonGiveaway',
+          targetSeat: winner.seat,
+          duration: 0 // Waiting for user input
+        };
+        this.state.currentTurn = winner.seat; // Focus on winner
+        return true;
+      }
+
+      // Trick is won. For now, just clear the table
+      this.state.lastTrick = null;
+      this.passCount = 0;
+      
+      if (winner && winner.hand.length === 0) {
+        // If winner is out, pass lead to the next active player counter-clockwise
+        let t = (winner.seat + 3) % 4;
+        let pLoops = 4;
+        while (pLoops > 0) {
+          const nextP = this.state.players.find(x => x.seat === t);
+          if (nextP && nextP.hand.length > 0) {
+            this.state.currentTurn = t;
+            break;
+          }
+          t = (t + 3) % 4;
+          pLoops--;
+        }
+      } else if (winner) {
+        this.state.currentTurn = winner.seat;
+      }
+    }
+
+    if (this.checkRoundEnd()) return true;
+
+    return true;
+  }
+
+  private advanceTurn() {
+    // Clear UI events unless it's a persistent prompt or a timed animation
+    if (this.state.cardEvent?.type !== 'DragonGiveaway' && 
+        this.state.cardEvent?.type !== 'DragonReceived' && 
+        this.state.cardEvent?.type !== 'Dog') {
+      this.state.cardEvent = null;
+    }
+
+    // Counter-clockwise turn advancement
+    let nextTurn = (this.state.currentTurn + 3) % 4;
+    // Skip players who are out of cards
+    let maxLoops = 4;
+    while (maxLoops > 0) {
+      const p = this.state.players.find(p => p.seat === nextTurn);
+      if (p && p.hand.length > 0) {
+        this.state.currentTurn = nextTurn;
+        return;
+      }
+      nextTurn = (nextTurn + 3) % 4;
+      maxLoops--;
+    }
+  }
+
+  giveDragonTrick(playerId: string, targetId: string) {
+    if (this.state.phase !== 'PLAYING') return false;
+    if (this.state.cardEvent?.type !== 'DragonGiveaway') return false;
+
+    const player = this.state.players.find(p => p.id === playerId);
+    if (!player || player.seat !== this.state.cardEvent.targetSeat) return false;
+
+    const target = this.state.players.find(p => p.id === targetId);
+    if (!target) return false;
+    
+    // Target must be an opponent
+    if (target.team === player.team) return false;
+
+    // Everything is valid, assign the trick (points would be added here later)
+    this.state.lastTrick = null;
+    this.passCount = 0;
+    this.state.cardEvent = {
+      type: 'DragonReceived',
+      duration: 3000,
+      fromSeat: player.seat,
+      targetSeat: target.seat
+    };
+
+    // Restore turn to the winner (or next active if out)
+    if (player.hand.length === 0) {
+      let t = (player.seat + 1) % 4;
+      let pLoops = 4;
+      while (pLoops > 0) {
+        const nextP = this.state.players.find(x => x.seat === t);
+        if (nextP && nextP.hand.length > 0) {
+          this.state.currentTurn = t;
+          break;
+        }
+        t = (t + 1) % 4;
+        pLoops--;
+      }
+    } else {
+      this.state.currentTurn = player.seat;
+    }
+
+    if (this.checkRoundEnd()) return true;
+
+    return true;
+  }
+
+  private checkRoundEnd(): boolean {
+    if (this.finishedPlayers.length >= 2) {
+      const first = this.state.players.find(p => p.id === this.finishedPlayers[0]);
+      const second = this.state.players.find(p => p.id === this.finishedPlayers[1]);
+      
+      // 1-2 Victory
+      console.log("CHECKING 1-2 VICTORY:", this.finishedPlayers, first?.team, second?.team); if (this.finishedPlayers.length === 2 && first && second && first.team === second.team) {
+        this.state.phase = 'FINISHED';
+        this.state.cardEvent = { type: 'OneTwoVictory', targetSeat: first.seat, duration: 5000 };
+        // Basic 200 point score adjustment (ignoring grand/tichu calls for now to keep it simple)
+        if (first.team === 'A') this.state.scores.teamA += 200;
+        else this.state.scores.teamB += 200;
+        return true;
+      }
+    }
+
+    console.log("CHECKING NORMAL END:", this.finishedPlayers); if (this.finishedPlayers.length >= 3) {
+      // Normal End
+      this.state.phase = 'FINISHED';
+      this.state.cardEvent = { type: 'RoundEnd', targetSeat: 0, duration: 5000 };
+      // Scoring logic would go here. For now, we just end the round
+      return true;
+    }
+
+    return false;
   }
 }

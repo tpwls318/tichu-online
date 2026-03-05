@@ -73,11 +73,6 @@
 
 .my-hand {
   display: flex;
-  flex-wrap: wrap; 
-  justify-content: center;
-  align-items: center;
-.my-hand {
-  display: flex;
   flex-wrap: wrap; /* 카드가 창 너비 초과 시 자연스럽게 줄바꿈 */
   justify-content: center; /* 무조건 화면 정중앙에 배치 */
   align-items: center;
@@ -90,9 +85,6 @@
 .card-wrapper {
   position: relative;
   /* 꼼수 마진 일체 삭제 (0) -> 수학적, 시각적 완벽한 Center 정복 */
-  margin: 0;
-}
-  font-weight: bold;
 }
 
 .card-count {

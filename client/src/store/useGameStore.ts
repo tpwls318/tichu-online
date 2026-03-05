@@ -14,6 +14,9 @@ interface GameStore {
   startSoloTest: (nickname: string) => void;
   answerGrandTichu: (callGrand: boolean) => void;
   passCards: (targetMap: { [targetId: string]: string }) => void;
+  playCards: (cardIds: string[], wishValue?: number) => void;
+  passTrick: () => void;
+  giveDragonTrick: (targetId: string) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -65,6 +68,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const roomId = get().gameState?.roomId;
     if (roomId) {
       get().socket?.emit('passCards', { roomId, targetMap });
+    }
+  },
+
+  playCards: (cardIds, wishValue) => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('playCards', { roomId, cardIds, wishValue });
+    }
+  },
+
+  passTrick: () => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('passTrick', { roomId });
+    }
+  },
+
+  giveDragonTrick: (targetId) => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('giveDragonTrick', { roomId, targetId });
     }
   }
 }));

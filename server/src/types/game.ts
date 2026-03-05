@@ -27,8 +27,12 @@ export interface GameState {
     cards: Card[];
     playerId: string;
     type: string;
+    value: number;
   } | null;
   scores: { teamA: number; teamB: number };
-  passStates: { [playerId: string]: { [targetPlayerId: string]: Card } }; // New field
+  passStates: { [playerId: string]: { [targetPlayerId: string]: Card } }; 
+  receivedPasses?: { [playerId: string]: { [fromPlayerId: string]: Card } }; // UI delay tracking
+  cardEvent?: { type: string; targetSeat: number; duration: number; fromSeat?: number } | null;
+  currentWish: number | null;
   history: any[];
 }
