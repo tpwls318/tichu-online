@@ -12,6 +12,7 @@ export interface Player {
   id: string;
   nickname: string;
   hand: Card[];
+  collectedCards: Card[];
   tichuState: 'GRAND' | 'SMALL' | 'NONE' | null;
   isReady: boolean;
   team: 'A' | 'B';
@@ -23,6 +24,7 @@ export interface GameState {
   players: Player[];
   phase: GamePhase;
   currentTurn: number;
+  currentTrickCards: Card[];
   lastTrick: {
     cards: Card[];
     playerId: string;

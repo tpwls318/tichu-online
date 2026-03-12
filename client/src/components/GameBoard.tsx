@@ -177,8 +177,27 @@ export const GameBoard: React.FC = () => {
   };
 
   return (
-    <div className="game-board">
-      <div className="opponents">
+    <div className="game-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#141E26' }}>
+      {/* 🚀 상단 공통 Top Bar (스코어 및 부가 기능) */}
+      <div className="game-top-bar" style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '10px 20px', backgroundColor: '#0B1015', borderBottom: '1px solid #2C3E50', color: 'white', zIndex: 200
+      }}>
+        <div className="scoreboard-ui" style={{
+          display: 'flex', gap: '20px', fontWeight: 'bold', fontSize: '1.1rem'
+        }}>
+          <div style={{ color: me.team === 'A' ? '#f1c40f' : '#ecf0f1' }}>A팀: {gameState.scores.teamA}점</div>
+          <div style={{ color: me.team === 'B' ? '#f1c40f' : '#ecf0f1' }}>B팀: {gameState.scores.teamB}점</div>
+        </div>
+        
+        {/* 나중에 채팅이나 메뉴 버튼이 들어갈 자리 */}
+        <div className="top-bar-actions" style={{ display: 'flex', gap: '10px' }}>
+          <span style={{ fontSize: '0.9rem', color: '#95a5a6' }}>방 번호: {gameState.roomId}</span>
+        </div>
+      </div>
+
+      <div className="game-board" style={{ flex: 1, height: '100%' }}>
+        <div className="opponents">
         {sortedOthers.map((p: any, idx) => (
           <div key={p.id} className={`other-player pos-${idx} ${p.tichuState === 'GRAND' ? 'called-grand' : ''}`}>
             <div className="player-info">
@@ -437,6 +456,7 @@ export const GameBoard: React.FC = () => {
             );
           })}
         </div>
+      </div>
       </div>
     </div>
   );

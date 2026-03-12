@@ -17,6 +17,7 @@ export class TichuEngine {
       players: [],
       phase: 'WAITING',
       currentTurn: 0,
+      currentTrickCards: [],
       lastTrick: null,
       scores: { teamA: 0, teamB: 0 },
       passStates: {},
@@ -35,6 +36,7 @@ export class TichuEngine {
       id,
       nickname,
       hand: [],
+      collectedCards: [],
       tichuState: null,
       isReady: false,
       team,
@@ -54,6 +56,7 @@ export class TichuEngine {
     
     this.state.players.forEach((player, i) => {
       player.hand = hands8[i] || [];
+      player.collectedCards = [];
       player.tichuState = null;
       this.remainingHands[player.id] = hands6[i] || [];
       this.state.passStates[player.id] = {};
@@ -253,6 +256,8 @@ export class TichuEngine {
       trickValue = this.state.lastTrick.value + 0.5;
     }
 
+    this.state.currentTrickCards.push(...cardsToPlay);
+
     this.state.lastTrick = {
       cards: cardsToPlay,
       playerId,
@@ -315,10 +320,16 @@ export class TichuEngine {
           duration: 0 // Waiting for user input
         };
         this.state.currentTurn = winner.seat; // Focus on winner
+        // Keep currentTrickCards intact for giveDragonTrick to use
         return true;
       }
 
-      // Trick is won. For now, just clear the table
+      // Trick is won. Collect cards!
+      if (winner) {
+        winner.collectedCards.push(...this.state.currentTrickCards);
+      }
+      this.state.currentTrickCards = [];
+
       this.state.lastTrick = null;
       this.passCount = 0;
       
@@ -381,7 +392,10 @@ export class TichuEngine {
     // Target must be an opponent
     if (target.team === player.team) return false;
 
-    // Everything is valid, assign the trick (points would be added here later)
+    // Everything is valid, assign the trick to the target
+    target.collectedCards.push(...this.state.currentTrickCards);
+    this.state.currentTrickCards = [];
+
     this.state.lastTrick = null;
     this.passCount = 0;
     this.state.cardEvent = {
@@ -419,21 +433,106 @@ export class TichuEngine {
       const second = this.state.players.find(p => p.id === this.finishedPlayers[1]);
       
       // 1-2 Victory
-      console.log("CHECKING 1-2 VICTORY:", this.finishedPlayers, first?.team, second?.team); if (this.finishedPlayers.length === 2 && first && second && first.team === second.team) {
+      if (this.finishedPlayers.length === 2 && first && second && first.team === second.team) {
         this.state.phase = 'FINISHED';
         this.state.cardEvent = { type: 'OneTwoVictory', targetSeat: first.seat, duration: 5000 };
-        // Basic 200 point score adjustment (ignoring grand/tichu calls for now to keep it simple)
+        // Basic 200 point score adjustment for 1-2 win
         if (first.team === 'A') this.state.scores.teamA += 200;
         else this.state.scores.teamB += 200;
+
+        // Evaluate Tichu Calls
+        this.state.players.forEach(p => {
+          if (p.tichuState === 'GRAND') {
+            if (p.id === first.id) {
+              if (p.team === 'A') this.state.scores.teamA += 200;
+              else this.state.scores.teamB += 200;
+            } else {
+              if (p.team === 'A') this.state.scores.teamA -= 200;
+              else this.state.scores.teamB -= 200;
+            }
+          } else if (p.tichuState === 'SMALL') {
+            if (p.id === first.id) {
+              if (p.team === 'A') this.state.scores.teamA += 100;
+              else this.state.scores.teamB += 100;
+            } else {
+              if (p.team === 'A') this.state.scores.teamA -= 100;
+              else this.state.scores.teamB -= 100;
+            }
+          }
+        });
+
         return true;
       }
     }
 
-    console.log("CHECKING NORMAL END:", this.finishedPlayers); if (this.finishedPlayers.length >= 3) {
+    if (this.finishedPlayers.length >= 3) {
       // Normal End
       this.state.phase = 'FINISHED';
+      
+      const lastPlayerId = this.state.players.find(p => !this.finishedPlayers.includes(p.id))?.id;
+      const firstPlayerId = this.finishedPlayers[0];
+      
+      if (lastPlayerId && firstPlayerId) {
+        const lastPlayer = this.state.players.find(p => p.id === lastPlayerId);
+        const firstPlayer = this.state.players.find(p => p.id === firstPlayerId);
+        
+        if (lastPlayer && firstPlayer) {
+          // 4th place penalty 1: Give last player's unplayed hand to the opposing team
+          const opposingTeam = lastPlayer.team === 'A' ? 'B' : 'A';
+          const opponent = this.state.players.find(p => p.team === opposingTeam);
+          if (opponent) {
+            opponent.collectedCards.push(...lastPlayer.hand);
+          }
+          lastPlayer.hand = []; // Clear hand so standard end triggers cleanly
+          
+          // 4th place penalty 2: Give last player's collected tricks to first player
+          firstPlayer.collectedCards.push(...lastPlayer.collectedCards);
+          lastPlayer.collectedCards = [];
+        }
+      }
+
+      // Calculate final points from collected cards
+      let teamAPoints = 0;
+      let teamBPoints = 0;
+
+      this.state.players.forEach(p => {
+        let points = 0;
+        p.collectedCards.forEach(c => {
+          if (c.value === 5) points += 5;
+          else if (c.value === 10 || c.value === 13) points += 10;
+          else if (c.value === 15) points += 25; // Dragon
+          else if (c.value === 16) points -= 25; // Phoenix
+        });
+        
+        if (p.team === 'A') teamAPoints += points;
+        else teamBPoints += points;
+      });
+
+      this.state.scores.teamA += teamAPoints;
+      this.state.scores.teamB += teamBPoints;
+
+      // Evaluate Tichu Calls
+      this.state.players.forEach(p => {
+        if (p.tichuState === 'GRAND') {
+          if (p.id === firstPlayerId) {
+            if (p.team === 'A') this.state.scores.teamA += 200;
+            else this.state.scores.teamB += 200;
+          } else {
+            if (p.team === 'A') this.state.scores.teamA -= 200;
+            else this.state.scores.teamB -= 200;
+          }
+        } else if (p.tichuState === 'SMALL') {
+          if (p.id === firstPlayerId) {
+            if (p.team === 'A') this.state.scores.teamA += 100;
+            else this.state.scores.teamB += 100;
+          } else {
+            if (p.team === 'A') this.state.scores.teamA -= 100;
+            else this.state.scores.teamB -= 100;
+          }
+        }
+      });
+
       this.state.cardEvent = { type: 'RoundEnd', targetSeat: 0, duration: 5000 };
-      // Scoring logic would go here. For now, we just end the round
       return true;
     }
 

@@ -2,11 +2,11 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   box-sizing: border-box;
-  padding: 20px 0; /* 좌우 패딩 제거하여 공간 확보 */
-  background-color: #1a252f;
+  padding: 15px 0 20px 0;
+  background-color: #141E26; /* wrapper와 통일 */
   overflow: hidden;
   position: relative;
 }
