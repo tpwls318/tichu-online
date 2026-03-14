@@ -140,7 +140,6 @@ export const Lobby: React.FC<LobbyProps> = ({ onJoin, onCreate, onSoloTest }) =>
         <button
           disabled={!nickname}
           onClick={() => handleOpenSettings('SOLO')}
-          style={{ backgroundColor: '#8e44ad' }}
         >
           빠른 테스트 (봇 3명 추가)
         </button>

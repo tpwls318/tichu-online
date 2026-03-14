@@ -4,47 +4,50 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background-color: #2c3e50;
+  background: linear-gradient(135deg, #152232 0%, #1e3450 50%, #152232 100%);
   color: white;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.lobby-container h1 {
+  font-size: 2.8rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #e2c066, #f5d98a);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 2px;
 }
 
 .lobby-box {
-  background: white;
+  background: #243447;
   padding: 2rem;
   border-radius: 12px;
-  color: #333;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  color: #e0e0e0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid #345170;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-width: 320px;
 }
 
-input {
-  padding: 0.8rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+.lobby-box input {
+  padding: 0.8rem 1rem;
+  border: 1px solid #345170;
+  border-radius: 8px;
   font-size: 1rem;
-}
-
-button {
-  padding: 0.8rem 1.5rem;
-  background-color: #27ae60;
+  background-color: #1a2a3a;
   color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background 0.2s;
+  outline: none;
 }
 
-button:hover:not(:disabled) {
-  background-color: #219150;
+.lobby-box input:focus {
+  border-color: #5aa0e8;
 }
 
-button:disabled {
-  background-color: #bdc3c7;
-  cursor: not-allowed;
+.lobby-box input::placeholder {
+  color: #5a6a7a;
 }
 
 .lobby-actions {
@@ -53,13 +56,95 @@ button:disabled {
   gap: 1rem;
 }
 
+.lobby-actions > button {
+  padding: 0.85rem 1.5rem;
+  background-color: #5aa0e8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.lobby-actions > button:hover:not(:disabled) {
+  background-color: #4890d8;
+  transform: translateY(-1px);
+}
+
+.lobby-actions > button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.lobby-actions > button:disabled {
+  background-color: #3a4a5a;
+  color: #7a8a9a;
+  cursor: not-allowed;
+}
+
 .join-box {
   display: flex;
   gap: 0.5rem;
 }
 
+.join-box input {
+  flex: 1;
+}
+
+.join-box button {
+  padding: 0.8rem 1.2rem;
+  background-color: #5aa0e8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.join-box button:hover:not(:disabled) {
+  background-color: #4890d8;
+}
+
+.join-box button:disabled {
+  background-color: #3a4a5a;
+  color: #7a8a9a;
+  cursor: not-allowed;
+}
+
 .solo-action {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
+}
+
+.solo-action button {
+  padding: 0.85rem 1.5rem;
+  background-color: #6c5ce7 !important;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: background-color 0.2s, transform 0.1s;
+  width: 100%;
+}
+
+.solo-action button:hover:not(:disabled) {
+  background-color: #5a4bd6 !important;
+  transform: translateY(-1px);
+}
+
+.solo-action button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.solo-action button:disabled {
+  background-color: #3a4a5a !important;
+  color: #7a8a9a;
+  cursor: not-allowed;
 }
 
 /* ── Settings Modal ── */
@@ -77,9 +162,10 @@ button:disabled {
 }
 
 .settings-modal {
-  background-color: #2c3e50;
+  background-color: #1c2b3a;
   padding: 30px;
   border-radius: 12px;
+  border: 1px solid #2a3f55;
   width: 300px;
   display: flex;
   flex-direction: column;
@@ -99,19 +185,8 @@ button:disabled {
 }
 
 .settings-field label {
-  color: #aaa;
+  color: #8a9ab0;
   font-size: 0.9rem;
-}
-
-.settings-select {
-  padding: 10px 16px;
-  border-radius: 6px;
-  border: 1px solid #455a64;
-  background-color: #34495e;
-  color: white;
-  font-size: 1rem;
-  cursor: pointer;
-  outline: none;
 }
 
 .settings-actions {
@@ -124,17 +199,25 @@ button:disabled {
   flex: 1;
   padding: 12px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   color: white;
   cursor: pointer;
-  transition: none; /* 리렌더 시 transition 깜빡임 방지 */
+  font-weight: 600;
+  transition: none;
 }
 
 .settings-btn-cancel {
-  background-color: #7f8c8d;
+  background-color: #3a4a5a;
+}
+
+.settings-btn-cancel:hover {
+  background-color: #4a5a6a;
 }
 
 .settings-btn-confirm {
-  background-color: #2ecc71;
-  font-weight: bold;
+  background-color: #4a90d9;
+}
+
+.settings-btn-confirm:hover {
+  background-color: #3a7bc8;
 }

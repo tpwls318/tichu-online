@@ -12,6 +12,31 @@ export const GameBoard: React.FC = () => {
   const [selectedPlayCards, setSelectedPlayCards] = useState<string[]>([]);
   const [activeEvent, setActiveEvent] = useState<any | null>(null);
   const [showWishPrompt, setShowWishPrompt] = useState(false);
+  const [delayedLastTrick, setDelayedLastTrick] = useState<any | null>(null);
+
+  // 트릭이 비워질 때 잠시 동안 바닥에 남겨서 보여주기 위한 효과
+  useEffect(() => {
+    if (gameState?.lastTrick) {
+      setDelayedLastTrick(gameState.lastTrick);
+    } else if (!gameState?.lastTrick && delayedLastTrick) {
+      // 내가 낸 카드로 인해 트릭이 종료된 경우(내 턴에서 모두 패스) 딜레이 생략
+      if (delayedLastTrick.playerId === socket?.id) {
+        setDelayedLastTrick(null);
+      } else {
+        const timer = setTimeout(() => {
+          setDelayedLastTrick(null);
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [gameState?.lastTrick, socket?.id, delayedLastTrick]);
+
+  useEffect(() => {
+    if (gameState?.phase === 'GRAND_TICHU' || gameState?.phase === 'WAITING') {
+      setPassingTargets({});
+      setActiveTarget(null);
+    }
+  }, [gameState?.phase]);
 
   if (!gameState || !socket) return null;
 
@@ -198,6 +223,79 @@ export const GameBoard: React.FC = () => {
         </div>
       </div>
 
+      {/* 라운드 결과 오버레이 */}
+      {gameState.phase === 'FINISHED' && gameState.roundResult && (() => {
+        const targetScore = gameState.settings?.targetScore || 1000;
+        const aWon = gameState.scores.teamA >= targetScore;
+        const bWon = gameState.scores.teamB >= targetScore;
+        const gameEnded = aWon || bWon;
+
+        let resultMessage = gameState.roundResult.message;
+        if (gameEnded) {
+          const myTeamWon = (aWon && me.team === 'A') || (bWon && me.team === 'B');
+          if (myTeamWon) {
+             resultMessage = `🏆 우리 팀이 ${targetScore}점 이상을 달성하여 승리했습니다!`;
+          } else {
+             resultMessage = `💀 상대 팀이 ${targetScore}점 이상을 달성하여 패배했습니다.`;
+          }
+        }
+
+        const myColor = '#3498db';
+        const oppColor = '#e74c3c';
+        const teamAColor = me.team === 'A' ? myColor : oppColor;
+        const teamBColor = me.team === 'B' ? myColor : oppColor;
+        const teamAName = me.team === 'A' ? 'A팀(우리)' : 'A팀(상대)';
+        const teamBName = me.team === 'B' ? 'B팀(우리)' : 'B팀(상대)';
+
+        return (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 500
+          }}>
+            <div style={{
+              backgroundColor: '#2c3e50', padding: '40px', borderRadius: '16px',
+              textAlign: 'center', color: 'white', minWidth: '360px'
+            }}>
+              <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: gameEnded ? '#f1c40f' : 'white' }}>
+                {resultMessage}
+              </h2>
+              
+              <div style={{ marginBottom: '20px', width: '100%' }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #34495e', paddingBottom: '10px', marginBottom: '10px', fontWeight: 'bold', color: '#95a5a6' }}>
+                  <div style={{ flex: 1, textAlign: 'left' }}>Round</div>
+                  <div style={{ flex: 1, textAlign: 'center', color: teamAColor }}>{teamAName}</div>
+                  <div style={{ flex: 1, textAlign: 'center', color: teamBColor }}>{teamBName}</div>
+                </div>
+                
+                {gameState.roundHistory?.map((historyResult: any, index: number) => (
+                  <div key={index} style={{ display: 'flex', padding: '6px 0' }}>
+                    <div style={{ flex: 1, textAlign: 'left', color: '#bdc3c7' }}>{index + 1}R</div>
+                    <div style={{ flex: 1, textAlign: 'center', color: teamAColor }}>
+                      {historyResult.teamA}
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'center', color: teamBColor }}>
+                      {historyResult.teamB}
+                    </div>
+                  </div>
+                ))}
+                
+                <div style={{ display: 'flex', paddingTop: '10px', marginTop: '10px', borderTop: '1px solid #34495e', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                  <div style={{ flex: 1, textAlign: 'left', color: '#95a5a6' }}>Total</div>
+                  <div style={{ flex: 1, textAlign: 'center', color: teamAColor }}>{gameState.roundResult?.teamATotal}</div>
+                  <div style={{ flex: 1, textAlign: 'center', color: teamBColor }}>{gameState.roundResult?.teamBTotal}</div>
+                </div>
+              </div>
+
+              {/* 승리 조건 달성 시 '다음 라운드' 문구 숨김 */}
+              {!gameEnded && (
+                <div style={{ fontSize: '0.85rem', color: '#7f8c8d' }}>잠시 후 다음 라운드가 시작됩니다...</div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="game-board" style={{ flex: 1, height: '100%' }}>
         <div className="opponents">
         {sortedOthers.map((p: any, idx) => (
@@ -321,20 +419,6 @@ export const GameBoard: React.FC = () => {
                   <strong>{gameState.players.find((p: any) => p.seat === activeEvent.fromSeat)?.nickname}</strong> 님이 <strong>{gameState.players.find((p: any) => p.seat === activeEvent.targetSeat)?.nickname}</strong> 님에게 트릭 더미를 넘겨주었습니다!
                 </p>
               </div>
-            ) : activeEvent?.type === 'OneTwoVictory' ? (
-              <div className="victory-event-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '40px', borderRadius: '15px', zIndex: 1000, border: '3px solid #f1c40f', boxShadow: '0 10px 40px rgba(0,0,0,0.9)' }}>
-                <h2 style={{ color: '#f1c40f', fontSize: '2.5rem', marginBottom: '10px', textShadow: '0 0 10px rgba(241, 196, 15, 0.5)' }}>🎉 원투 승리! 🎉</h2>
-                <p style={{ color: 'white', fontSize: '1.4rem', margin: 0 }}>
-                  한 팀의 두 플레이어가 모두 카드를 털어 200점을 획득했습니다!<br/>곧 다음 라운드가 시작됩니다.
-                </p>
-              </div>
-            ) : activeEvent?.type === 'RoundEnd' ? (
-              <div className="victory-event-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '40px', borderRadius: '15px', zIndex: 1000, border: '3px solid #2ecc71', boxShadow: '0 10px 40px rgba(0,0,0,0.9)' }}>
-                <h2 style={{ color: '#2ecc71', fontSize: '2.5rem', marginBottom: '10px' }}>🏁 라운드 종료! 🏁</h2>
-                <p style={{ color: 'white', fontSize: '1.4rem', margin: 0 }}>
-                  세 명의 플레이어가 카드를 모두 털었습니다.<br/>점수 정산 후 다음 라운드가 시작됩니다.
-                </p>
-              </div>
             ) : showWishPrompt ? (
               <div className="wish-prompt-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, border: '2px solid #f1c40f', boxShadow: '0 10px 30px rgba(0,0,0,0.8)', width: '90%', maxWidth: '400px' }}>
                 <h3 style={{ color: '#f1c40f', marginBottom: '20px' }}>🐦 참새의 소원: 원하는 숫자를 선택하세요</h3>
@@ -376,15 +460,15 @@ export const GameBoard: React.FC = () => {
                 
                 {/* 트릭(현재 깔린 패) 표시 영역 */}
                 <div className="current-trick" style={{ minHeight: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  {gameState.lastTrick ? (
+                  {delayedLastTrick ? (
                     <>
                       <div style={{ marginBottom: '10px', color: '#f1c40f' }}>
-                        {gameState.players.find((p: any) => p.id === gameState.lastTrick?.playerId)?.nickname}의 {gameState.lastTrick.type}
+                        {gameState.players.find((p: any) => p.id === delayedLastTrick?.playerId)?.nickname}의 {delayedLastTrick.type}
                       </div>
                       <div style={{ display: 'flex', gap: '5px' }}>
-                        {gameState.lastTrick.cards.map((card: any) => (
+                        {delayedLastTrick.cards.map((card: any) => (
                            <div key={card.id} style={{ width: '60px', height: '85px' }}>
-                             <CardComponent suit={card.suit} value={card.value} id={card.id} isSelected={false} onClick={() => {}} />
+                             <CardComponent suit={card.suit} value={card.value} id={card.id} isSelected={false} disableHover={true} onClick={() => {}} />
                            </div>
                         ))}
                       </div>

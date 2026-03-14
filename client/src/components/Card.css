@@ -25,6 +25,12 @@
   transform: translateY(-15px);
 }
 
+/* 트릭에 깔린 카드는 호버 효과 비활성화 */
+.card.disable-hover:hover {
+  transform: none;
+  cursor: default;
+}
+
 /* 카드가 선택된 경우 좀 더 위로 튀어나오고 노란 불빛 */
 .card.selected {
   box-shadow: inset 0 0 0 3px #f1c40f, 0 10px 20px rgba(241, 196, 15, 0.5);

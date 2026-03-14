@@ -112,10 +112,6 @@ const start = async () => {
               const enemies = engine.state.players.filter(p => p.team !== botPlayer.team);
               
               if (partner && enemies.length === 2) {
-                // Sort hand by value (ascending)
-                // Note: Dog=0, Sparrow=1, Dragon=15, Phoenix=16
-                // For simplicity, we give the absolute lowest 2 cards to enemies, and the absolute highest to partner.
-                // A better AI would keep Dog/Sparrow, but a simple value sort satisfies the immediate request.
                 const sortedHand = [...botPlayer.hand].sort((a, b) => a.value - b.value);
                 
                 const lowest1 = sortedHand[0];
@@ -131,6 +127,43 @@ const start = async () => {
             }
           });
         }
+      };
+
+      // 라운드 종료 후 5초 뒤 자동으로 다음 라운드 시작
+      const checkAndTriggerNewRound = (engine: ReturnType<RoomManager['getRoom']>, roomId: string) => {
+        if (!engine || engine.state.phase !== 'FINISHED') return;
+
+        setTimeout(() => {
+          if (!engine || engine.state.phase !== 'FINISHED') return;
+          
+          const targetScore = engine.state.settings?.targetScore || 1000;
+          if (engine.state.scores.teamA >= targetScore) {
+            engine.state.roundResult!.message = `🏆 A팀이 ${targetScore}점을 달성하여 최종 승리했습니다!`;
+            io.to(roomId).emit('gameStateUpdate', engine.state);
+            return;
+          } else if (engine.state.scores.teamB >= targetScore) {
+            engine.state.roundResult!.message = `🏆 B팀이 ${targetScore}점을 달성하여 최종 승리했습니다!`;
+            io.to(roomId).emit('gameStateUpdate', engine.state);
+            return;
+          }
+
+          engine.startNewRound();
+          io.to(roomId).emit('gameStateUpdate', engine.state);
+          console.log(`New round started in room ${roomId}`);
+
+          // 솔로 모드 봇 처리
+          const botIds = [`bot1_${roomId}`, `bot2_${roomId}`, `bot3_${roomId}`];
+          const hasBot = engine.state.players.some(p => botIds.includes(p.id));
+          if (hasBot) {
+            setTimeout(() => {
+              botIds.forEach(botId => {
+                engine.answerGrandTichu(botId, false);
+              });
+              checkAndTriggerBotPassing(engine, roomId);
+              io.to(roomId).emit('gameStateUpdate', engine.state);
+            }, 500);
+          }
+        }, 5000); // 5초간 라운드 결과 표시 후 다음 라운드
       };
 
       const checkAndTriggerBotPlay = (engine: ReturnType<RoomManager['getRoom']>, roomId: string) => {
@@ -239,6 +272,8 @@ const start = async () => {
           
           // Recursively check next turn
           checkAndTriggerBotPlay(engine, roomId);
+          // 라운드 종료 체크
+          checkAndTriggerNewRound(engine, roomId);
         }, 1500); // 1.5 second bot think time
       };
 
@@ -269,6 +304,7 @@ const start = async () => {
         if (engine.playCards(socket.id, cardIds, wishValue)) {
           io.to(roomId).emit('gameStateUpdate', engine.state);
           checkAndTriggerBotPlay(engine, roomId);
+          checkAndTriggerNewRound(engine, roomId);
         }
       });
 
@@ -279,6 +315,7 @@ const start = async () => {
         if (engine.passTrick(socket.id)) {
           io.to(roomId).emit('gameStateUpdate', engine.state);
           checkAndTriggerBotPlay(engine, roomId);
+          checkAndTriggerNewRound(engine, roomId);
         }
       });
 
@@ -289,6 +326,7 @@ const start = async () => {
         if (engine.giveDragonTrick(socket.id, targetId)) {
           io.to(roomId).emit('gameStateUpdate', engine.state);
           checkAndTriggerBotPlay(engine, roomId);
+          checkAndTriggerNewRound(engine, roomId);
         }
       });
 

@@ -41,4 +41,12 @@ export interface GameState {
     targetScore: number;
     timeLimit: number;
   };
+  roundHistory: { teamA: number; teamB: number }[];
+  roundResult?: {
+    teamADelta: number;
+    teamBDelta: number;
+    teamATotal: number;
+    teamBTotal: number;
+    message: string;
+  } | null;
 }

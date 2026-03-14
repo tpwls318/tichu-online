@@ -5,9 +5,9 @@
 
 .custom-select-trigger {
   padding: 10px 16px;
-  border-radius: 6px;
-  border: 1px solid #455a64;
-  background-color: #34495e;
+  border-radius: 8px;
+  border: 1px solid #2a3f55;
+  background-color: #0f1923;
   color: white;
   font-size: 1rem;
   cursor: pointer;
@@ -18,7 +18,7 @@
 }
 
 .custom-select-trigger:hover {
-  border-color: #607d8b;
+  border-color: #4a90d9;
 }
 
 .custom-select-arrow {
@@ -36,13 +36,13 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background-color: #34495e;
-  border: 1px solid #455a64;
-  border-radius: 6px;
+  background-color: #1c2b3a;
+  border: 1px solid #2a3f55;
+  border-radius: 8px;
   max-height: 300px;
   overflow-y: auto;
   z-index: 1100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 .custom-select-option {
@@ -53,10 +53,10 @@
 }
 
 .custom-select-option:hover {
-  background-color: #455a64;
+  background-color: #2a3f55;
 }
 
 .custom-select-option.selected {
-  background-color: #2ecc71;
+  background-color: #4a90d9;
   font-weight: bold;
 }

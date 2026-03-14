@@ -25,6 +25,7 @@ export class TichuEngine {
       cardEvent: null,
       currentWish: null,
       history: [],
+      roundHistory: [],
       settings: settings || { targetScore: 1000, timeLimit: 30 }
     };
   }
@@ -65,6 +66,35 @@ export class TichuEngine {
     
     this.state.phase = 'GRAND_TICHU';
     this.grandTichuResponses = {};
+    return true;
+  }
+
+  startNewRound() {
+    // 점수와 설정은 유지하고 나머지 초기화
+    this.deck.reset();
+    this.deck.shuffle();
+    const { hands8, hands6 } = this.deck.deal();
+
+    this.state.players.forEach((player, i) => {
+      player.hand = hands8[i] || [];
+      player.collectedCards = [];
+      player.tichuState = null;
+      this.remainingHands[player.id] = hands6[i] || [];
+      this.state.passStates[player.id] = {};
+    });
+
+    this.state.phase = 'GRAND_TICHU';
+    this.state.lastTrick = null;
+    this.state.currentTrickCards = [];
+    this.state.currentTurn = 0;
+    this.state.currentWish = null;
+    this.state.cardEvent = null;
+    this.state.roundResult = null;
+    this.state.receivedPasses = {};
+    this.grandTichuResponses = {};
+    this.passCount = 0;
+    this.finishedPlayers = [];
+
     return true;
   }
 
@@ -429,6 +459,9 @@ export class TichuEngine {
   }
 
   private checkRoundEnd(): boolean {
+    const prevScoreA = this.state.scores.teamA;
+    const prevScoreB = this.state.scores.teamB;
+
     if (this.finishedPlayers.length >= 2) {
       const first = this.state.players.find(p => p.id === this.finishedPlayers[0]);
       const second = this.state.players.find(p => p.id === this.finishedPlayers[1]);
@@ -438,8 +471,11 @@ export class TichuEngine {
         this.state.phase = 'FINISHED';
         this.state.cardEvent = { type: 'OneTwoVictory', targetSeat: first.seat, duration: 5000 };
         // Basic 200 point score adjustment for 1-2 win
-        if (first.team === 'A') this.state.scores.teamA += 200;
-        else this.state.scores.teamB += 200;
+        if (first.team === 'A') {
+          this.state.scores.teamA += 200;
+        } else {
+          this.state.scores.teamB += 200;
+        }
 
         // Evaluate Tichu Calls
         this.state.players.forEach(p => {
@@ -461,6 +497,18 @@ export class TichuEngine {
             }
           }
         });
+
+        const deltaA = this.state.scores.teamA - prevScoreA;
+        const deltaB = this.state.scores.teamB - prevScoreB;
+        this.state.roundHistory.push({ teamA: deltaA, teamB: deltaB });
+
+        this.state.roundResult = {
+          teamADelta: deltaA,
+          teamBDelta: deltaB,
+          teamATotal: this.state.scores.teamA,
+          teamBTotal: this.state.scores.teamB,
+          message: `${first.team}팀 1-2 승리!`
+        };
 
         return true;
       }
@@ -534,6 +582,19 @@ export class TichuEngine {
       });
 
       this.state.cardEvent = { type: 'RoundEnd', targetSeat: 0, duration: 5000 };
+
+      const deltaA = this.state.scores.teamA - prevScoreA;
+      const deltaB = this.state.scores.teamB - prevScoreB;
+      this.state.roundHistory.push({ teamA: deltaA, teamB: deltaB });
+
+      this.state.roundResult = {
+        teamADelta: deltaA,
+        teamBDelta: deltaB,
+        teamATotal: this.state.scores.teamA,
+        teamBTotal: this.state.scores.teamB,
+        message: '라운드 종료'
+      };
+
       return true;
     }
 
