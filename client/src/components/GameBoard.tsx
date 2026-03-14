@@ -4,7 +4,7 @@ import { useGameStore } from '../store/useGameStore';
 import './GameBoard.css';
 
 export const GameBoard: React.FC = () => {
-  const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick } = useGameStore();
+  const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick, toggleReady, playAgain, leaveRoom } = useGameStore();
   const [passingTargets, setPassingTargets] = useState<{ [targetId: string]: string }>({});
   const [activeTarget, setActiveTarget] = useState<string | null>(null);
   const [showReceived, setShowReceived] = useState(false);
@@ -225,6 +225,7 @@ export const GameBoard: React.FC = () => {
 
       {/* 라운드 결과 오버레이 */}
       {gameState.phase === 'FINISHED' && gameState.roundResult && (() => {
+        const isBotGame = gameState.players.some((p: any) => p.id.startsWith('bot'));
         const targetScore = gameState.settings?.targetScore || 1000;
         const aWon = gameState.scores.teamA >= targetScore;
         const bWon = gameState.scores.teamB >= targetScore;
@@ -287,9 +288,35 @@ export const GameBoard: React.FC = () => {
                 </div>
               </div>
 
-              {/* 승리 조건 달성 시 '다음 라운드' 문구 숨김 */}
-              {!gameEnded && (
+              {/* 승리 조건 달성 시 '다음 라운드' 문구 숨김, 버튼 노출 */}
+              {!gameEnded ? (
                 <div style={{ fontSize: '0.85rem', color: '#7f8c8d' }}>잠시 후 다음 라운드가 시작됩니다...</div>
+              ) : (
+                <div style={{ marginTop: '20px', display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                  {isBotGame ? (
+                    <>
+                      <button 
+                        onClick={playAgain}
+                        style={{ padding: '12px 24px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        다시하기
+                      </button>
+                      <button 
+                        onClick={leaveRoom}
+                        style={{ padding: '12px 24px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        처음화면으로
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={leaveRoom}
+                      style={{ padding: '12px 24px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      방 나가기
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -302,7 +329,7 @@ export const GameBoard: React.FC = () => {
           <div key={p.id} className={`other-player pos-${idx} ${p.tichuState === 'GRAND' ? 'called-grand' : ''}`}>
             <div className="player-info">
               {p.nickname} ({p.team}팀)
-              {p.tichuState === 'GRAND' && <div className="grand-badge">👑 라지 티츄</div>}
+              {p.tichuState === 'GRAND' && <span className="grand-badge">👑 라지 티츄</span>}
               <div className="card-count">🎴 {p.hand.length}</div>
             </div>
           </div>
@@ -311,10 +338,36 @@ export const GameBoard: React.FC = () => {
 
       <div className="center-area">
         {gameState.phase === 'WAITING' && (
-          <div className="waiting-ui">
-            <h2>방 번호: {gameState.roomId}</h2>
-            <p>대기 중... ({gameState.players.length}/4명)</p>
-            <p>4명이 모두 모이면 게임이 시작됩니다.</p>
+          <div className="waiting-ui" style={{ backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', textAlign: 'center', minWidth: '350px', border: '2px solid #34495e' }}>
+            <h2 style={{ color: '#ecf0f1', marginBottom: '10px' }}>방 번호: {gameState.roomId}</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '20px 0' }}>
+              {gameState.players.map((p: any) => (
+                 <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: '#34495e', borderRadius: '8px', alignItems: 'center' }}>
+                    <span style={{ color: 'white', fontWeight: 'bold' }}>{p.nickname}</span>
+                    <span style={{ color: p.isReady ? '#2ecc71' : '#e74c3c', fontWeight: 'bold' }}>{p.isReady ? '레디 완료' : '준비 중'}</span>
+                 </div>
+              ))}
+              {/* Show empty slots */}
+              {Array.from({ length: 4 - gameState.players.length }).map((_, idx) => (
+                 <div key={idx} style={{ padding: '12px 20px', backgroundColor: '#2c3e50', borderRadius: '8px', color: '#7f8c8d', fontStyle: 'italic' }}>
+                    ... 빈 자리 ...
+                 </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '30px' }}>
+              <button 
+                onClick={toggleReady}
+                style={{ flex: 1, padding: '15px 0', backgroundColor: me.isReady ? '#e74c3c' : '#2ecc71', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                {me.isReady ? '레디 취소' : '레디'}
+              </button>
+              <button
+                 onClick={leaveRoom}
+                 style={{ flex: 1, padding: '15px 0', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                 나가기
+              </button>
+            </div>
           </div>
         )}
 
@@ -500,7 +553,7 @@ export const GameBoard: React.FC = () => {
                     >
                       {(gameState.currentTurn !== me.seat && isBomb(selectedPlayCards)) ? `🧨 폭탄 난입 (${selectedPlayCards.length}장)` : `제출 (${selectedPlayCards.length}장)`}
                     </button>
-                    {gameState.currentTurn === me.seat && (
+                    {gameState.currentTurn === me.seat && gameState.currentTrickCards.length > 0 && (
                       <button 
                         className="pass-btn"
                         style={{ padding: '10px 20px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '5px', fontSize: '1.1rem', cursor: 'pointer' }}

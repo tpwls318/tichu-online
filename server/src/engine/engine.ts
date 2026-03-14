@@ -49,6 +49,25 @@ export class TichuEngine {
     return true;
   }
 
+  removePlayer(id: string) {
+    const playerIndex = this.state.players.findIndex(p => p.id === id);
+    if (playerIndex !== -1) {
+      this.state.players.splice(playerIndex, 1);
+      
+      // Reassign seats to remaining players
+      this.state.players.forEach((p, index) => {
+        p.seat = index;
+      });
+      
+      // If the game was running and someone leaves, we might need to reset to WAITING
+      // but for now we'll just return to waiting room unconditionally if we lose a player
+      if (this.state.phase !== 'WAITING') {
+        this.returnToWaitingRoom();
+      }
+    }
+    return this.state.players.length;
+  }
+
   startGame() {
     if (this.state.players.length < 4) return false;
     
@@ -96,6 +115,38 @@ export class TichuEngine {
     this.finishedPlayers = [];
 
     return true;
+  }
+
+  toggleReady(playerId: string) {
+    const player = this.state.players.find(p => p.id === playerId);
+    if (player) {
+      player.isReady = !player.isReady;
+    }
+  }
+
+  returnToWaitingRoom() {
+    this.state.phase = 'WAITING';
+    this.state.scores = { teamA: 0, teamB: 0 };
+    this.state.history = [];
+    this.state.roundHistory = [];
+    this.state.currentTrickCards = [];
+    this.state.lastTrick = null;
+    this.state.cardEvent = null;
+    this.state.currentWish = null;
+    this.state.roundResult = null;
+    this.state.passStates = {};
+    this.state.receivedPasses = {};
+    this.passCount = 0;
+    this.finishedPlayers = [];
+    this.grandTichuResponses = {};
+    this.remainingHands = {};
+    
+    this.state.players.forEach(p => {
+      p.hand = [];
+      p.collectedCards = [];
+      p.tichuState = null;
+      p.isReady = false;
+    });
   }
 
   answerGrandTichu(playerId: string, callGrand: boolean) {

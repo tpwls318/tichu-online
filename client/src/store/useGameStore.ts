@@ -17,6 +17,10 @@ interface GameStore {
   playCards: (cardIds: string[], wishValue?: number) => void;
   passTrick: () => void;
   giveDragonTrick: (targetId: string) => void;
+  toggleReady: () => void;
+  returnToWaitingRoom: () => void;
+  playAgain: () => void;
+  leaveRoom: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -90,5 +94,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (roomId) {
       get().socket?.emit('giveDragonTrick', { roomId, targetId });
     }
+  },
+
+  toggleReady: () => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('toggleReady', { roomId });
+    }
+  },
+
+  returnToWaitingRoom: () => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('returnToWaitingRoom', { roomId });
+    }
+  },
+
+  playAgain: () => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('playAgain', { roomId });
+    }
+  },
+
+  leaveRoom: () => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('leaveRoom', { roomId });
+    }
+    set({ gameState: null, roomId: null });
   }
 }));

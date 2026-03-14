@@ -14,6 +14,10 @@ export class RoomManager {
     return this.rooms.get(roomId);
   }
 
+  getAllRooms(): [string, TichuEngine][] {
+    return Array.from(this.rooms.entries());
+  }
+
   removeRoom(roomId: string) {
     this.rooms.delete(roomId);
   }

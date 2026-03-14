@@ -54,11 +54,6 @@ const start = async () => {
           socket.join(roomId);
           console.log(`${nickname} joined room ${roomId}`);
           
-          if (engine.state.players.length === 4 && engine.state.phase === 'WAITING') {
-            engine.startGame();
-            console.log(`Game started in room ${roomId}`);
-          }
-          
           io.to(roomId).emit('gameStateUpdate', engine.state);
         } else {
           socket.emit('error', '방이 가득 찼습니다.');
@@ -330,9 +325,83 @@ const start = async () => {
         }
       });
 
+      socket.on('toggleReady', ({ roomId }) => {
+        const engine = roomManager.getRoom(roomId);
+        if (!engine || engine.state.phase !== 'WAITING') return;
+
+        engine.toggleReady(socket.id);
+        
+        // Check if all 4 players are ready
+        if (engine.state.players.length === 4 && engine.state.players.every(p => p.isReady)) {
+          engine.startGame();
+          console.log(`Game started dynamically in room ${roomId} as all players are ready`);
+        }
+        
+        io.to(roomId).emit('gameStateUpdate', engine.state);
+      });
+
+      socket.on('returnToWaitingRoom', ({ roomId }) => {
+        const engine = roomManager.getRoom(roomId);
+        if (!engine || engine.state.phase !== 'FINISHED') return;
+
+        engine.returnToWaitingRoom();
+        io.to(roomId).emit('gameStateUpdate', engine.state);
+      });
+
+      socket.on('playAgain', ({ roomId }) => {
+        const engine = roomManager.getRoom(roomId);
+        if (!engine || engine.state.phase !== 'FINISHED') return;
+
+        engine.returnToWaitingRoom();
+        engine.startGame();
+        
+        io.to(roomId).emit('gameStateUpdate', engine.state);
+        console.log(`Solo Test game restarted in room ${roomId}`);
+
+        setTimeout(() => {
+          const botIds = [`bot1_${roomId}`, `bot2_${roomId}`, `bot3_${roomId}`];
+          botIds.forEach(botId => {
+            engine.answerGrandTichu(botId, false);
+          });
+          
+          checkAndTriggerBotPassing(engine, roomId);
+          io.to(roomId).emit('gameStateUpdate', engine.state);
+        }, 500);
+      });
+      socket.on('leaveRoom', ({ roomId }) => {
+        const engine = roomManager.getRoom(roomId);
+        if (engine) {
+          socket.leave(roomId);
+          const remaining = engine.removePlayer(socket.id);
+          
+          if (remaining === 0) {
+            roomManager.removeRoom(roomId);
+            console.log(`Room ${roomId} removed as it is empty.`);
+          } else {
+            io.to(roomId).emit('gameStateUpdate', engine.state);
+            console.log(`Player ${socket.id} left room ${roomId}`);
+          }
+        }
+      });
+
       socket.on('disconnect', () => {
-        console.log('user disconnected');
-        // TODO: Handle reconnection/player leaving
+        console.log(`user ${socket.id} disconnected`);
+        // Find which room they were in and remove them
+        const allRooms = roomManager.getAllRooms();
+        for (const [roomId, engine] of allRooms) {
+          const player = engine.state.players.find((p: any) => p.id === socket.id);
+          if (player) {
+            const remaining = engine.removePlayer(socket.id);
+            if (remaining === 0) {
+              roomManager.removeRoom(roomId);
+              console.log(`Room ${roomId} removed as it is empty after disconnect.`);
+            } else {
+              io.to(roomId).emit('gameStateUpdate', engine.state);
+              console.log(`Player ${socket.id} auto-removed from room ${roomId} on disconnect.`);
+            }
+            break; // A socket can only be in one room at a time in this setup
+          }
+        }
       });
     });
 

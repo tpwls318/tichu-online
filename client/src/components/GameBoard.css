@@ -175,12 +175,14 @@ button:hover {
 .grand-badge {
   background: #f1c40f;
   color: #c0392b;
-  font-size: 0.8rem;
-  padding: 2px 5px;
-  border-radius: 4px;
-  margin-top: 5px;
-  display: inline-block;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-left: 10px;    /* 이름과 너무 붙지 않게 여백 추가 */
+  display: inline-flex;
+  align-items: center;
   font-weight: bold;
+  vertical-align: middle;
 }
 
 .called-grand {
