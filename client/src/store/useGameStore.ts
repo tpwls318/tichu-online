@@ -9,9 +9,9 @@ interface GameStore {
   roomId: string | null;
   error: string | null;
   connect: () => void;
-  createRoom: (nickname: string) => void;
+  createRoom: (nickname: string, settings?: { targetScore: number, timeLimit: number }) => void;
   joinRoom: (nickname: string, roomId: string) => void;
-  startSoloTest: (nickname: string) => void;
+  startSoloTest: (nickname: string, settings?: { targetScore: number, timeLimit: number }) => void;
   answerGrandTichu: (callGrand: boolean) => void;
   passCards: (targetMap: { [targetId: string]: string }) => void;
   playCards: (cardIds: string[], wishValue?: number) => void;
@@ -45,16 +45,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ socket });
   },
 
-  createRoom: (nickname) => {
-    get().socket?.emit('createRoom', { nickname });
+  createRoom: (nickname, settings) => {
+    get().socket?.emit('createRoom', { nickname, settings });
   },
 
   joinRoom: (nickname, roomId) => {
     get().socket?.emit('joinRoom', { nickname, roomId });
   },
 
-  startSoloTest: (nickname) => {
-    get().socket?.emit('startSoloTest', { nickname });
+  startSoloTest: (nickname, settings) => {
+    get().socket?.emit('startSoloTest', { nickname, settings });
   },
 
   answerGrandTichu: (callGrand) => {

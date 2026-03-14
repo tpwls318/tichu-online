@@ -1,0 +1,62 @@
+.custom-select {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-trigger {
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: 1px solid #455a64;
+  background-color: #34495e;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.custom-select-trigger:hover {
+  border-color: #607d8b;
+}
+
+.custom-select-arrow {
+  font-size: 0.7rem;
+  margin-left: 10px;
+  transition: transform 0.15s;
+}
+
+.custom-select-arrow.open {
+  transform: rotate(180deg);
+}
+
+.custom-select-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background-color: #34495e;
+  border: 1px solid #455a64;
+  border-radius: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.custom-select-option {
+  padding: 10px 16px;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.custom-select-option:hover {
+  background-color: #455a64;
+}
+
+.custom-select-option.selected {
+  background-color: #2ecc71;
+  font-weight: bold;
+}

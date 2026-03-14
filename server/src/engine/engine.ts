@@ -10,7 +10,7 @@ export class TichuEngine {
   private passCount: number = 0;
   private finishedPlayers: string[] = [];
 
-  constructor(roomId: string) {
+  constructor(roomId: string, settings?: { targetScore: number; timeLimit: number }) {
     this.deck = new TichuDeck();
     this.state = {
       roomId,
@@ -24,7 +24,8 @@ export class TichuEngine {
       receivedPasses: {},
       cardEvent: null,
       currentWish: null,
-      history: []
+      history: [],
+      settings: settings || { targetScore: 1000, timeLimit: 30 }
     };
   }
   

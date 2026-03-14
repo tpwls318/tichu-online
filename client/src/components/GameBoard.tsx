@@ -190,9 +190,11 @@ export const GameBoard: React.FC = () => {
           <div style={{ color: me.team === 'B' ? '#f1c40f' : '#ecf0f1' }}>B팀: {gameState.scores.teamB}점</div>
         </div>
         
-        {/* 나중에 채팅이나 메뉴 버튼이 들어갈 자리 */}
-        <div className="top-bar-actions" style={{ display: 'flex', gap: '10px' }}>
-          <span style={{ fontSize: '0.9rem', color: '#95a5a6' }}>방 번호: {gameState.roomId}</span>
+        {/* 설정 정보 및 방 번호 표시 */}
+        <div className="top-bar-actions" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.9rem', color: '#95a5a6' }}>목표: {gameState.settings?.targetScore || 1000}점</span>
+          <span style={{ fontSize: '0.9rem', color: '#95a5a6' }}>턴 시간: {gameState.settings?.timeLimit || 30}초</span>
+          <span style={{ fontSize: '0.9rem', color: '#95a5a6', borderLeft: '1px solid #455a64', paddingLeft: '15px' }}>방 번호: {gameState.roomId}</span>
         </div>
       </div>
 

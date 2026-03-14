@@ -61,3 +61,80 @@ button:disabled {
 .solo-action {
   margin-top: 2rem;
 }
+
+/* ── Settings Modal ── */
+.settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.settings-modal {
+  background-color: #2c3e50;
+  padding: 30px;
+  border-radius: 12px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-modal h2 {
+  margin: 0;
+  color: white;
+  text-align: center;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-field label {
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.settings-select {
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: 1px solid #455a64;
+  background-color: #34495e;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.settings-actions button {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: none; /* 리렌더 시 transition 깜빡임 방지 */
+}
+
+.settings-btn-cancel {
+  background-color: #7f8c8d;
+}
+
+.settings-btn-confirm {
+  background-color: #2ecc71;
+  font-weight: bold;
+}

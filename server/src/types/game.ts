@@ -37,4 +37,8 @@ export interface GameState {
   cardEvent?: { type: string; targetSeat: number; duration: number; fromSeat?: number } | null;
   currentWish: number | null;
   history: any[];
+  settings?: {
+    targetScore: number;
+    timeLimit: number;
+  };
 }

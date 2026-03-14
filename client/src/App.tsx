@@ -15,9 +15,9 @@ function App() {
     return (
       <div className="app-root">
         <Lobby 
-          onCreate={(nickname) => createRoom(nickname)}
+          onCreate={(nickname, settings) => createRoom(nickname, settings)}
           onJoin={(nickname, roomId) => joinRoom(nickname, roomId)}
-          onSoloTest={(nickname) => startSoloTest(nickname)}
+          onSoloTest={(nickname, settings) => startSoloTest(nickname, settings)}
         />
         {error && <div className="error-toast">{error}</div>}
       </div>

@@ -3,9 +3,9 @@ import { TichuEngine } from './engine.js';
 export class RoomManager {
   private rooms: Map<string, TichuEngine> = new Map();
 
-  createRoom(): string {
+  createRoom(settings?: { targetScore: number; timeLimit: number }): string {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const engine = new TichuEngine(roomId);
+    const engine = new TichuEngine(roomId, settings);
     this.rooms.set(roomId, engine);
     return roomId;
   }

@@ -33,8 +33,8 @@ const start = async () => {
     io.on('connection', (socket) => {
       console.log('a user connected:', socket.id);
 
-      socket.on('createRoom', ({ nickname }) => {
-        const roomId = roomManager.createRoom();
+      socket.on('createRoom', ({ nickname, settings }) => {
+        const roomId = roomManager.createRoom(settings);
         const engine = roomManager.getRoom(roomId)!;
         engine.addPlayer(socket.id, nickname);
         
@@ -65,9 +65,9 @@ const start = async () => {
         }
       });
 
-      socket.on('startSoloTest', ({ nickname }) => {
+      socket.on('startSoloTest', ({ nickname, settings }) => {
         // Create a room
-        const roomId = roomManager.createRoom();
+        const roomId = roomManager.createRoom(settings);
         const engine = roomManager.getRoom(roomId)!;
         
         // Add real player
