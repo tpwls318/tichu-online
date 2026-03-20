@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CardComponent } from './Card';
+import { HandValidator } from '../../../server/src/engine/validator';
 import { useGameStore } from '../store/useGameStore';
 import './GameBoard.css';
 
 export const GameBoard: React.FC = () => {
-  const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick, toggleReady, playAgain, leaveRoom } = useGameStore();
+  const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick, toggleReady, callSmallTichu, playAgain, leaveRoom } = useGameStore();
   const [passingTargets, setPassingTargets] = useState<{ [targetId: string]: string }>({});
   const [activeTarget, setActiveTarget] = useState<string | null>(null);
   const [showReceived, setShowReceived] = useState(false);
@@ -328,6 +329,16 @@ export const GameBoard: React.FC = () => {
         {sortedOthers.map((p: any, idx) => (
           <div key={p.id} className={`other-player pos-${idx} ${p.tichuState === 'GRAND' ? 'called-grand' : ''}`}>
             <div className="player-info">
+              {p.seat === gameState.currentTurn && (
+                <div style={{ 
+                  backgroundColor: '#27ae60', color: 'white', padding: '2px 10px', 
+                  borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', 
+                  marginBottom: '6px', display: 'inline-block'
+                }}>
+                  현재 차례
+                </div>
+              )}
+              <br />
               {p.nickname} ({p.team}팀)
               {p.tichuState === 'GRAND' && <span className="grand-badge">👑 라지 티츄</span>}
               <div className="card-count">🎴 {p.hand.length}</div>
@@ -373,37 +384,40 @@ export const GameBoard: React.FC = () => {
 
         {gameState.phase === 'GRAND_TICHU' && (
           <div className="passing-ui">
-            <h3>라지 티츄를 선언하시겠습니까? (현재 8장)</h3>
             {me.tichuState !== null ? (
               <p>다른 플레이어의 대답을 기다리는 중입니다... (현재 {me.hand.length}장)</p>
             ) : (
-              <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '20px' }}>
-                <button onClick={() => answerGrandTichu(true)} style={{ backgroundColor: '#e74c3c' }}>라지 티츄 선언 (+200)</button>
-                <button onClick={() => answerGrandTichu(false)} style={{ backgroundColor: '#95a5a6' }}>패스</button>
-              </div>
+              <>
+                <h3>라지 티츄를 선언하시겠습니까? (현재 8장)</h3>
+                <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '20px' }}>
+                  <button onClick={() => answerGrandTichu(true)} style={{ backgroundColor: '#e74c3c' }}>라지 티츄 선언 (+200)</button>
+                  <button onClick={() => answerGrandTichu(false)} style={{ backgroundColor: '#95a5a6' }}>패스</button>
+                </div>
+              </>
             )}
           </div>
         )}
 
         {gameState.phase === 'PASSING' && (
           <div className="passing-ui">
-            <h3>선물할 카드를 1장씩 선택해주세요</h3>
             {hasAlreadyPassed ? (
               <p>다른 플레이어를 기다리는 중입니다...</p>
             ) : (
-              <div className="passing-targets">
-                {sortedOthers.map((p: any) => (
-                  <div 
-                    key={p.id} 
-                    className={`target-slot ${activeTarget === p.id ? 'active' : ''} ${passingTargets[p.id] ? 'filled' : ''}`}
-                    onClick={() => setActiveTarget(activeTarget === p.id ? null : p.id)}
-                  >
-                    <span>{getTargetName(p.id)}</span>
-                    <div className="slot-indicator">
-                       {passingTargets[p.id] ? '✅ 선택됨' : (activeTarget === p.id ? '👉 카드 고르기' : '클릭해서 대상 선택')}
+              <>
+                <h3>선물할 카드를 1장씩 선택해주세요</h3>
+                <div className="passing-targets">
+                  {sortedOthers.map((p: any) => (
+                    <div 
+                      key={p.id} 
+                      className={`target-slot ${activeTarget === p.id ? 'active' : ''} ${passingTargets[p.id] ? 'filled' : ''}`}
+                      onClick={() => setActiveTarget(activeTarget === p.id ? null : p.id)}
+                    >
+                      <div className="target-name">{getTargetName(p.id)}</div>
+                      <div className="target-nick">{p.nickname}</div>
+                      {passingTargets[p.id] && <div className="check-mark">✓</div>}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
                 
                 <button 
                   disabled={Object.keys(passingTargets).length !== 3} 
@@ -412,7 +426,7 @@ export const GameBoard: React.FC = () => {
                 >
                   카드 보내기 (3장)
                 </button>
-              </div>
+              </>
             )}
           </div>
         )}
@@ -503,14 +517,27 @@ export const GameBoard: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', alignItems: 'center', gap: '20px' }}>
-                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                  현재 턴: {gameState.players.find((p: any) => p.seat === gameState.currentTurn)?.nickname}
-                  {gameState.currentWish && <span style={{ marginLeft: '10px', color: '#f1c40f' }}>🐦 현재 소원: {
-                    gameState.currentWish === 11 ? 'J' : gameState.currentWish === 12 ? 'Q' : gameState.currentWish === 13 ? 'K' : gameState.currentWish === 14 ? 'A' : gameState.currentWish
-                  }</span>}
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', alignItems: 'center', gap: '20px', width: '100%', textAlign: 'center' }}>
+                  {/* 소원 표시 */}
+                  {gameState.currentWish && (
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                      <span style={{ color: '#f1c40f' }}>🐦 현재 소원: {
+                        gameState.currentWish === 11 ? 'J' : gameState.currentWish === 12 ? 'Q' : gameState.currentWish === 13 ? 'K' : gameState.currentWish === 14 ? 'A' : gameState.currentWish
+                      }</span>
+                    </div>
+                  )}
                 
+                {/* 본인 턴일 경우 중앙 더미 덱 위치 위에 배지 표시 */}
+                {gameState.currentTurn === me.seat && (
+                  <div style={{ 
+                    backgroundColor: '#27ae60', color: 'white', padding: '6px 20px', 
+                    borderRadius: '20px', fontSize: '1.1rem', fontWeight: 'bold',
+                    marginBottom: '10px'
+                  }}>
+                    현재 차례
+                  </div>
+                )}
+
                 {/* 트릭(현재 깔린 패) 표시 영역 */}
                 <div className="current-trick" style={{ minHeight: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   {delayedLastTrick ? (
@@ -518,26 +545,61 @@ export const GameBoard: React.FC = () => {
                       <div style={{ marginBottom: '10px', color: '#f1c40f' }}>
                         {gameState.players.find((p: any) => p.id === delayedLastTrick?.playerId)?.nickname}의 {delayedLastTrick.type}
                       </div>
-                      <div style={{ display: 'flex', gap: '5px' }}>
+                      <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', width: '100%' }}>
                         {delayedLastTrick.cards.map((card: any) => (
-                           <div key={card.id} style={{ width: '60px', height: '85px' }}>
-                             <CardComponent suit={card.suit} value={card.value} id={card.id} isSelected={false} disableHover={true} onClick={() => {}} />
-                           </div>
+                          <CardComponent suit={card.suit} value={card.value} id={card.id} isSelected={false} disableHover={true} onClick={() => {}} />
                         ))}
                       </div>
                     </>
                   ) : (
-                    <div style={{ color: '#aaa', fontStyle: 'italic', paddingTop: '40px' }}>
-                      {gameState.currentTurn === me.seat ? '바닥에 깔린 카드가 없습니다. 주도권을 쥐고 있습니다!' : '새로운 트릭이 시작됩니다. 시작 플레이를 기다리는 중...'}
+                    <div style={{ paddingTop: '40px', textAlign: 'center' }}>
+                      {gameState.currentTurn === me.seat ? (
+                        <span style={{ color: '#f1c40f', fontWeight: 'bold', fontSize: '1.4rem' }}>원하는 카드를 내주세요</span>
+                      ) : (
+                        <span style={{ color: '#aaa', fontStyle: 'italic' }}>시작 플레이를 기다리는 중...</span>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* 내 턴이거나 폭탄을 들고 있을 때 컨트롤 표시 (게임 중일 때만) */}
                 {gameState.phase === 'PLAYING' && (gameState.currentTurn === me.seat || (selectedPlayCards.length >= 4 && isBomb(selectedPlayCards))) && (
-                  <div className="play-controls" style={{ display: 'flex', gap: '15px', marginTop: '20px', marginBottom: '20px', zIndex: 10, position: 'relative' }}>
-                    <button 
-                      className="play-btn" 
+                  <div className="play-controls" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', zIndex: 10, position: 'relative', width: '100%' }}>
+                    
+                    {/* 선택된 조합 표시 */}
+                    {selectedPlayCards.length > 0 && (
+                      <div style={{ fontSize: '1.3rem', color: '#f1c40f', fontWeight: 'bold' }}>
+                        {(() => {
+                           const selectedCardsData = sortedHand.filter((c: any) => selectedPlayCards.includes(c.id));
+                           const combo = HandValidator.validate(selectedCardsData);
+                           
+                           if (!combo || combo.type === 'Invalid') return '낼수 없는 조합';
+                           
+                           const valueMap: Record<number, string> = {
+                             2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10',
+                             11: 'J', 12: 'Q', 13: 'K', 14: 'A', 15: '용', 16: '봉황', 1: '참새', 0: '개'
+                           };
+                           const valStr = valueMap[combo.value] || combo.value;
+                           
+                           switch(combo.type) {
+                             case 'Single': return `${valStr} 싱글`;
+                             case 'Pair': return `${valStr} 페어`;
+                             case 'ConsecutivePairs': return `${valStr} 연속 페어 (${combo.length}장)`;
+                             case 'Triple': return `${valStr} 트리플`;
+                             case 'FullHouse': return `${valStr} 풀하우스`;
+                             case 'Straight': return `${valStr} 스트레이트 (${combo.length}장)`;
+                             case 'BombQuartet': return `${valStr} 포카드 (폭탄)`;
+                             case 'BombStraightFlush': return `${valStr} 스티플 (폭탄)`;
+                             case 'Dog': return '개 (턴 넘기기)';
+                             default: return combo.type;
+                           }
+                        })()}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', width: '100%' }}>
+                      <button 
+                        className="play-btn" 
                       style={{ 
                         padding: '10px 20px', 
                         backgroundColor: (gameState.currentTurn !== me.seat && isBomb(selectedPlayCards)) ? '#e74c3c' : '#3498db', 
@@ -562,6 +624,16 @@ export const GameBoard: React.FC = () => {
                         패스
                       </button>
                     )}
+                    {gameState.phase === 'PLAYING' && !me.hasPlayedFirstCard && me.tichuState === null && (
+                      <button 
+                        className="tichu-btn"
+                        style={{ padding: '10px 20px', backgroundColor: '#f1c40f', color: '#c0392b', border: 'none', borderRadius: '5px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={callSmallTichu}
+                      >
+                        티츄 (+100)
+                      </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -571,8 +643,8 @@ export const GameBoard: React.FC = () => {
       </div>
 
       <div className="my-area">
-        <div className="my-status">
-          {me.tichuState === 'GRAND' && <div className="grand-badge-self">👑 라지 티츄</div>}
+        <div className="my-status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '15px' }}>
+          {me.tichuState === 'GRAND' && <div className="grand-badge-self" style={{ marginTop: '5px' }}>👑 라지 티츄</div>}
         </div>
         <div className="my-hand">
           {sortedHand.map((card: any) => {
@@ -580,7 +652,12 @@ export const GameBoard: React.FC = () => {
             const assigneeId = gameState.phase === 'PASSING' ? Object.keys(passingTargets).find(key => passingTargets[key] === card.id) : null;
             
             return (
-              <div key={card.id} className="card-wrapper" style={{ transform: isAssigned && gameState.phase === 'PLAYING' ? 'translateY(-15px)' : 'none', transition: 'transform 0.1s ease' }}>
+              <div key={card.id} className="card-wrapper" style={{ 
+                  transform: isAssigned && gameState.phase === 'PLAYING' ? 'translateY(-15px)' : 'none', 
+                  transition: 'transform 0.1s ease, box-shadow 0.1s ease',
+                  boxShadow: isAssigned ? '0 0 0 3px #f1c40f, 0 10px 20px rgba(241, 196, 15, 0.5)' : 'none',
+                  borderRadius: '8px'
+                }}>
                 {isAssigned && assigneeId && (
                   <div className="card-badge">{getTargetName(assigneeId)}</div>
                 )}
@@ -590,6 +667,7 @@ export const GameBoard: React.FC = () => {
                   id={card.id}
                   isSelected={false} // Selection visual is handled by translateY above and existing scale for hover
                   onClick={() => handleCardClick(card.id)}
+                  disableHover={isAssigned}
                 />
               </div>
             );

@@ -42,7 +42,8 @@ export class TichuEngine {
       tichuState: null,
       isReady: false,
       team,
-      seat: this.state.players.length
+      seat: this.state.players.length,
+      hasPlayedFirstCard: false
     };
     
     this.state.players.push(player);
@@ -79,6 +80,7 @@ export class TichuEngine {
       player.hand = hands8[i] || [];
       player.collectedCards = [];
       player.tichuState = null;
+      player.hasPlayedFirstCard = false;
       this.remainingHands[player.id] = hands6[i] || [];
       this.state.passStates[player.id] = {};
     });
@@ -98,6 +100,7 @@ export class TichuEngine {
       player.hand = hands8[i] || [];
       player.collectedCards = [];
       player.tichuState = null;
+      player.hasPlayedFirstCard = false;
       this.remainingHands[player.id] = hands6[i] || [];
       this.state.passStates[player.id] = {};
     });
@@ -145,8 +148,21 @@ export class TichuEngine {
       p.hand = [];
       p.collectedCards = [];
       p.tichuState = null;
+      p.hasPlayedFirstCard = false;
       p.isReady = false;
     });
+  }
+
+  callSmallTichu(playerId: string) {
+    if (this.state.phase !== 'PLAYING') return false;
+    
+    const player = this.state.players.find(p => p.id === playerId);
+    if (!player || player.hasPlayedFirstCard || player.tichuState !== null) {
+      return false;
+    }
+
+    player.tichuState = 'SMALL';
+    return true;
   }
 
   answerGrandTichu(playerId: string, callGrand: boolean) {

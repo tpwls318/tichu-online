@@ -1,4 +1,4 @@
-import { Card } from '../types/game.js';
+import type { Card } from '../types/game.js';
 
 export type ComboType = 
   | 'Single'

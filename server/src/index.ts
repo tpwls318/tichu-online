@@ -368,6 +368,16 @@ const start = async () => {
           io.to(roomId).emit('gameStateUpdate', engine.state);
         }, 500);
       });
+
+      socket.on('callSmallTichu', ({ roomId }) => {
+        const engine = roomManager.getRoom(roomId);
+        if (!engine) return;
+
+        if (engine.callSmallTichu(socket.id)) {
+          io.to(roomId).emit('gameStateUpdate', engine.state);
+          console.log(`Player ${socket.id} called Tichu in room ${roomId}`);
+        }
+      });
       socket.on('leaveRoom', ({ roomId }) => {
         const engine = roomManager.getRoom(roomId);
         if (engine) {

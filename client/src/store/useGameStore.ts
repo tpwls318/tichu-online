@@ -18,6 +18,7 @@ interface GameStore {
   passTrick: () => void;
   giveDragonTrick: (targetId: string) => void;
   toggleReady: () => void;
+  callSmallTichu: () => void;
   returnToWaitingRoom: () => void;
   playAgain: () => void;
   leaveRoom: () => void;
@@ -100,6 +101,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const roomId = get().gameState?.roomId;
     if (roomId) {
       get().socket?.emit('toggleReady', { roomId });
+    }
+  },
+
+  callSmallTichu: () => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('callSmallTichu', { roomId });
     }
   },
 

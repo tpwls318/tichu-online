@@ -17,6 +17,7 @@ export interface Player {
   isReady: boolean;
   team: 'A' | 'B';
   seat: number; // 0, 1, 2, 3 (clockwise)
+  hasPlayedFirstCard: boolean;
 }
 
 export interface GameState {
