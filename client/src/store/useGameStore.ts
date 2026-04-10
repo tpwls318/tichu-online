@@ -33,7 +33,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   connect: () => {
     if (get().socket) return;
     
-    const socket = io('http://localhost:3001');
+    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+    const socket = io(serverUrl);
     
     socket.on('roomCreated', ({ roomId, gameState }) => {
       set({ roomId, gameState, error: null });

@@ -20,7 +20,8 @@ fastify.get('/ping', async (request, reply) => {
 
 const start = async () => {
   try {
-    const address = await fastify.listen({ port: 3001, host: '0.0.0.0' });
+    const port = Number(process.env.PORT) || 3001;
+    const address = await fastify.listen({ port, host: '0.0.0.0' });
     const io = new Server(fastify.server, {
       cors: {
         origin: '*',
