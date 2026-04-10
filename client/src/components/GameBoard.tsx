@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CardComponent } from './Card';
-import { HandValidator } from '../../../server/src/engine/validator';
+import { HandValidator } from '../utils/validator';
 import { useGameStore } from '../store/useGameStore';
 import './GameBoard.css';
 
