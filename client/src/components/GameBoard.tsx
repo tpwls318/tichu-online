@@ -7,7 +7,6 @@ import './GameBoard.css';
 export const GameBoard: React.FC = () => {
   const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick, toggleReady, callSmallTichu, playAgain, leaveRoom } = useGameStore();
   const [passingTargets, setPassingTargets] = useState<{ [targetId: string]: string }>({});
-  const [activeTarget, setActiveTarget] = useState<string | null>(null);
   const [showReceived, setShowReceived] = useState(false);
   const hasShownReceived = useRef(false);
   const [selectedPlayCards, setSelectedPlayCards] = useState<string[]>([]);
@@ -54,7 +53,7 @@ export const GameBoard: React.FC = () => {
   useEffect(() => {
     if (gameState?.phase === 'GRAND_TICHU' || gameState?.phase === 'WAITING') {
       setPassingTargets({});
-      setActiveTarget(null);
+      setPendingPassCard(null);
     }
   }, [gameState?.phase]);
 
