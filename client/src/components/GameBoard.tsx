@@ -11,9 +11,28 @@ export const GameBoard: React.FC = () => {
   const [showReceived, setShowReceived] = useState(false);
   const hasShownReceived = useRef(false);
   const [selectedPlayCards, setSelectedPlayCards] = useState<string[]>([]);
+  const [pendingPassCard, setPendingPassCard] = useState<string | null>(null);
   const [activeEvent, setActiveEvent] = useState<any | null>(null);
   const [showWishPrompt, setShowWishPrompt] = useState(false);
   const [delayedLastTrick, setDelayedLastTrick] = useState<any | null>(null);
+  const [playError, setPlayError] = useState<string | null>(null);
+
+  const timeLimit = gameState?.settings?.timeLimit || 30;
+  const [timeLeft, setTimeLeft] = useState(timeLimit);
+
+  useEffect(() => {
+    if (gameState?.phase === 'PLAYING') {
+      setTimeLeft(timeLimit);
+    }
+  }, [gameState?.currentTurn, gameState?.phase, timeLimit]);
+
+  useEffect(() => {
+    if (gameState?.phase !== 'PLAYING') return;
+    const timerId = setInterval(() => {
+      setTimeLeft((prev: number) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timerId);
+  }, [gameState?.phase, gameState?.currentTurn]);
 
   // 트릭이 비워질 때 잠시 동안 바닥에 남겨서 보여주기 위한 효과
   useEffect(() => {
@@ -62,6 +81,48 @@ export const GameBoard: React.FC = () => {
     return suitOrder[a.suit] - suitOrder[b.suit];
   });
 
+  // 타임아웃 시 자동 플레이 로직
+  useEffect(() => {
+    if (timeLeft === 0 && gameState?.phase === 'PLAYING' && gameState?.currentTurn === me?.seat) {
+      if (gameState.cardEvent) return; // 애니메이션 진행 중 대기
+
+      const isFirstTrick = gameState.currentTrickCards?.length === 0;
+
+      // 1. 짹짹이 콜이 존재하고, 낼 수 있다면 해당 패를 자동으로 냄
+      if (gameState.currentWish !== null) {
+        if (HandValidator.canSatisfyWish(me.hand, gameState.currentWish, gameState.lastTrick)) {
+          const wishCards = me.hand.filter((c: any) => c.value === gameState.currentWish).map((c: any) => c.id);
+          
+          if (!gameState.lastTrick || gameState.lastTrick.type === 'Single') {
+            playCards([wishCards[0]]);
+            return;
+          } else if (gameState.lastTrick.type === 'Pair') {
+            playCards(wishCards.slice(0, 2));
+            return;
+          } else if (gameState.lastTrick.type === 'Triple') {
+            playCards(wishCards.slice(0, 3));
+            return;
+          } else {
+             playCards(wishCards.slice(0, 4));
+             return;
+          }
+        }
+      }
+
+      // 2. 첫 트릭이라 패스가 불가능할 경우 가장 낮은 카드 1장 자동 제출
+      if (isFirstTrick) {
+        if (sortedHand.length > 0) {
+          playCards([sortedHand[0].id]);
+        }
+      } else {
+        // 3. 그 외의 경우 자동 패스
+        passTrick();
+        setSelectedPlayCards([]);
+      }
+    }
+  }, [timeLeft, gameState?.phase, gameState?.currentTurn, gameState?.currentTrickCards, gameState?.currentWish, gameState?.lastTrick, me?.seat, me?.hand, sortedHand, playCards, passTrick, gameState?.cardEvent]);
+
+
   const otherPlayers = gameState.players.filter((p: any) => p.id !== socket.id);
   
   // Sort other players by seat relative to me
@@ -100,29 +161,20 @@ export const GameBoard: React.FC = () => {
   }, [gameState?.cardEvent]);
 
   const handleCardClick = (cardId: string) => {
-    if (gameState.phase === 'PASSING' && activeTarget) {
-      // Check if this card is already assigned to someone else
+    if (gameState.phase === 'PASSING') {
+      // 이미 배정된 카드를 다시 클릭하면 배정 해제
       const currentAssignee = Object.keys(passingTargets).find(key => passingTargets[key] === cardId);
-      
-      const newTargets = { ...passingTargets };
-      
       if (currentAssignee) {
-        // If assigned to someone else, remove it from them
+        const newTargets = { ...passingTargets };
         delete newTargets[currentAssignee];
+        setPassingTargets(newTargets);
+        setPendingPassCard(null);
+        return;
       }
-      
-      // Assign to current active target
-      newTargets[activeTarget] = cardId;
-      setPassingTargets(newTargets);
-      setActiveTarget(null); // Deselect target after picking a card
-     } else if (gameState.phase === 'PASSING' && !activeTarget) {
-      // If no target selected but card clicked, check if it's assigned to remove it
-       const currentAssignee = Object.keys(passingTargets).find(key => passingTargets[key] === cardId);
-       if (currentAssignee) {
-         const newTargets = { ...passingTargets };
-         delete newTargets[currentAssignee];
-         setPassingTargets(newTargets);
-       }
+      // 이미 3장 다 배정됐으면 더 선택 불가
+      if (Object.keys(passingTargets).length >= 3) return;
+      // 카드를 선택하면 pendingPassCard로 설정 (줄 사람 대기)
+      setPendingPassCard(pendingPassCard === cardId ? null : cardId);
     } else if (gameState.phase === 'PLAYING') {
       if (selectedPlayCards.includes(cardId)) {
         setSelectedPlayCards(prev => prev.filter(id => id !== cardId));
@@ -134,6 +186,27 @@ export const GameBoard: React.FC = () => {
 
   const handlePlaySubmit = () => {
     if (selectedPlayCards.length === 0) return;
+    
+    // 짹짹이 콜(Wish) 검증 로직
+    if (gameState.currentWish !== null) {
+      const selectedCardsData = me.hand.filter((c: any) => selectedPlayCards.includes(c.id));
+      const satisfiesWish = selectedCardsData.some((c: any) => c.value === gameState.currentWish);
+      
+      if (!satisfiesWish) {
+        // 콜을 만족시킬 수 있는지 확인
+        const canSatisfy = HandValidator.canSatisfyWish(me.hand, gameState.currentWish, gameState.lastTrick);
+        if (canSatisfy) {
+          const valueMap: Record<number, string> = {
+            2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10',
+            11: 'J', 12: 'Q', 13: 'K', 14: 'A'
+          };
+          const valStr = valueMap[gameState.currentWish] || gameState.currentWish;
+          setPlayError(`짹짹이의 콜(${valStr})을 낼 수 있는 패가 있습니다.\n반드시 포함해서 내야 합니다!`);
+          setTimeout(() => setPlayError(null), 3500);
+          return; // 제출 차단
+        }
+      }
+    }
     
     // Check if hand contains Sparrow (value 1)
     const hasSparrow = selectedPlayCards.some(id => {
@@ -157,6 +230,21 @@ export const GameBoard: React.FC = () => {
   };
 
   const handlePassTrick = () => {
+    // 짹짹이 콜(Wish) 검증 로직 (마찬가지로 낼 수 있으면 패스 불가)
+    if (gameState.currentWish !== null) {
+      const canSatisfy = HandValidator.canSatisfyWish(me.hand, gameState.currentWish, gameState.lastTrick);
+      if (canSatisfy) {
+        const valueMap: Record<number, string> = {
+          2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10',
+          11: 'J', 12: 'Q', 13: 'K', 14: 'A'
+        };
+        const valStr = valueMap[gameState.currentWish] || gameState.currentWish;
+        setPlayError(`짹짹이의 콜(${valStr})을 낼 수 있으므로\n패스할 수 없습니다!`);
+        setTimeout(() => setPlayError(null), 3500);
+        return; // 패스 차단
+      }
+    }
+
     passTrick();
     setSelectedPlayCards([]);
   };
@@ -335,7 +423,7 @@ export const GameBoard: React.FC = () => {
                   borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', 
                   marginBottom: '6px', display: 'inline-block'
                 }}>
-                  현재 차례
+                  현재 차례 <span style={{ color: timeLeft <= 5 ? '#e74c3c' : '#f1c40f' }}>({timeLeft}s)</span>
                 </div>
               )}
               <br />
@@ -384,7 +472,9 @@ export const GameBoard: React.FC = () => {
 
         {gameState.phase === 'GRAND_TICHU' && (
           <div className="passing-ui">
-            {me.tichuState !== null ? (
+            {me.tichuState === 'GRAND' ? (
+              <p>👑 라지 티츄를 선언했습니다! 다른 플레이어를 기다리는 중...</p>
+            ) : me.tichuState !== null ? (
               <p>다른 플레이어의 대답을 기다리는 중입니다... (현재 {me.hand.length}장)</p>
             ) : (
               <>
@@ -404,19 +494,31 @@ export const GameBoard: React.FC = () => {
               <p>다른 플레이어를 기다리는 중입니다...</p>
             ) : (
               <>
-                <h3>선물할 카드를 1장씩 선택해주세요</h3>
+                <h3>{pendingPassCard ? '줄 상대를 선택하세요' : '선물할 카드를 선택하세요'}</h3>
                 <div className="passing-targets">
-                  {sortedOthers.map((p: any) => (
-                    <div 
-                      key={p.id} 
-                      className={`target-slot ${activeTarget === p.id ? 'active' : ''} ${passingTargets[p.id] ? 'filled' : ''}`}
-                      onClick={() => setActiveTarget(activeTarget === p.id ? null : p.id)}
-                    >
-                      <div className="target-name">{getTargetName(p.id)}</div>
-                      <div className="target-nick">{p.nickname}</div>
-                      {passingTargets[p.id] && <div className="check-mark">✓</div>}
-                    </div>
-                  ))}
+                  {sortedOthers.map((p: any) => {
+                    const alreadyAssigned = !!passingTargets[p.id];
+                    return (
+                      <div 
+                        key={p.id} 
+                        className={`target-slot ${alreadyAssigned ? 'filled' : ''} ${pendingPassCard && !alreadyAssigned ? 'active' : ''}`}
+                        onClick={() => {
+                          if (!pendingPassCard || alreadyAssigned) return;
+                          // 카드가 이미 다른 사람에게 배정됐으면 해제
+                          const prevAssignee = Object.keys(passingTargets).find(key => passingTargets[key] === pendingPassCard);
+                          const newTargets = { ...passingTargets };
+                          if (prevAssignee) delete newTargets[prevAssignee];
+                          newTargets[p.id] = pendingPassCard;
+                          setPassingTargets(newTargets);
+                          setPendingPassCard(null);
+                        }}
+                      >
+                        <div className="target-name">{getTargetName(p.id)}</div>
+                        <div className="target-nick">{p.nickname}</div>
+                        {alreadyAssigned && <div className="check-mark">✓</div>}
+                      </div>
+                    );
+                  })}
                 </div>
                 
                 <button 
@@ -436,7 +538,7 @@ export const GameBoard: React.FC = () => {
             {showReceived && gameState.receivedPasses?.[me.id] ? (
               <div className="received-cards-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, boxShadow: '0 10px 30px rgba(0,0,0,0.8)', border: '2px solid #2ecc71', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '90%', maxWidth: '400px' }}>
                 <h3 style={{ color: '#2ecc71', marginBottom: '20px' }}>선물 교환 완료! (받은 카드)</h3>
-                <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginBottom: '30px', width: '100%' }}>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '30px', width: '100%' }}>
                   {Object.entries(gameState.receivedPasses[me.id]).map(([fromId, card]: [string, any]) => {
                     const sender = gameState.players.find((p: any) => p.id === fromId);
                     return (
@@ -517,7 +619,7 @@ export const GameBoard: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', alignItems: 'center', gap: '20px', width: '100%', textAlign: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', alignItems: 'center', gap: '12px', width: '100%', textAlign: 'center' }}>
                   {/* 소원 표시 */}
                   {gameState.currentWish && (
                     <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
@@ -534,7 +636,7 @@ export const GameBoard: React.FC = () => {
                     borderRadius: '20px', fontSize: '1.1rem', fontWeight: 'bold',
                     marginBottom: '10px'
                   }}>
-                    현재 차례
+                    현재 차례 <span style={{ color: timeLeft <= 5 ? '#e74c3c' : '#f1c40f' }}>({timeLeft}s)</span>
                   </div>
                 )}
 
@@ -564,7 +666,7 @@ export const GameBoard: React.FC = () => {
 
                 {/* 내 턴이거나 폭탄을 들고 있을 때 컨트롤 표시 (게임 중일 때만) */}
                 {gameState.phase === 'PLAYING' && (gameState.currentTurn === me.seat || (selectedPlayCards.length >= 4 && isBomb(selectedPlayCards))) && (
-                  <div className="play-controls" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', zIndex: 10, position: 'relative', width: '100%' }}>
+                  <div className="play-controls" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', zIndex: 10, position: 'relative', width: '100%' }}>
                     
                     {/* 선택된 조합 표시 */}
                     {selectedPlayCards.length > 0 && (
@@ -594,6 +696,13 @@ export const GameBoard: React.FC = () => {
                              default: return combo.type;
                            }
                         })()}
+                      </div>
+                    )}
+
+                    {/* 에러 메시지 표시 */}
+                    {playError && (
+                      <div style={{ color: '#e74c3c', fontWeight: 'bold', fontSize: '1.05rem', backgroundColor: 'rgba(231, 76, 60, 0.1)', padding: '10px 15px', borderRadius: '8px', border: '1px solid #e74c3c', width: '100%', maxWidth: '400px', textAlign: 'center', whiteSpace: 'pre-line' }}>
+                        ⚠️ {playError}
                       </div>
                     )}
 
@@ -643,8 +752,8 @@ export const GameBoard: React.FC = () => {
       </div>
 
       <div className="my-area">
-        <div className="my-status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '15px' }}>
-          {me.tichuState === 'GRAND' && <div className="grand-badge-self" style={{ marginTop: '5px' }}>👑 라지 티츄</div>}
+        <div className="my-status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginBottom: '25px', paddingLeft: '10px' }}>
+          {me.tichuState === 'GRAND' && <div className="grand-badge-self" style={{ marginTop: '0px' }}>👑 라지 티츄</div>}
         </div>
         <div className="my-hand">
           {sortedHand.map((card: any) => {
@@ -653,9 +762,6 @@ export const GameBoard: React.FC = () => {
             
             return (
               <div key={card.id} className="card-wrapper" style={{ 
-                  transform: isAssigned && gameState.phase === 'PLAYING' ? 'translateY(-15px)' : 'none', 
-                  transition: 'transform 0.1s ease, box-shadow 0.1s ease',
-                  boxShadow: isAssigned ? '0 0 0 3px #f1c40f, 0 10px 20px rgba(241, 196, 15, 0.5)' : 'none',
                   borderRadius: '8px'
                 }}>
                 {isAssigned && assigneeId && (
@@ -665,9 +771,10 @@ export const GameBoard: React.FC = () => {
                   suit={card.suit}
                   value={card.value}
                   id={card.id}
-                  isSelected={false} // Selection visual is handled by translateY above and existing scale for hover
+                  isSelected={false}
                   onClick={() => handleCardClick(card.id)}
                   disableHover={isAssigned}
+                  highlightColor={pendingPassCard === card.id ? '#3498db' : isAssigned ? '#f1c40f' : undefined}
                 />
               </div>
             );

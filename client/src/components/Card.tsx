@@ -7,11 +7,12 @@ interface CardProps {
   id: string;
   isSelected?: boolean;
   disableHover?: boolean;
+  highlightColor?: string;
   onClick?: () => void;
 }
 
 
-export const CardComponent: React.FC<CardProps> = ({ suit, value, id, isSelected, disableHover, onClick }) => {
+export const CardComponent: React.FC<CardProps> = ({ suit, value, id, isSelected, disableHover, highlightColor, onClick }) => {
   // The ID from the backend might be lowercase (e.g., 'sword_14').
   // Our images are capitalized (e.g., 'Sword_14.png', 'Dragon.png').
   // It's safer to reconstruct the filename using the suit and value props which have correct casing.
@@ -30,6 +31,7 @@ export const CardComponent: React.FC<CardProps> = ({ suit, value, id, isSelected
     <div 
       className={`card ${isSelected ? 'selected' : ''} ${disableHover ? 'disable-hover' : ''}`}
       onClick={onClick}
+      style={highlightColor ? { outline: `3px solid ${highlightColor}`, outlineOffset: '-3px' } : undefined}
     >
       <img src={imagePath} alt={id} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable="false" />
     </div>
