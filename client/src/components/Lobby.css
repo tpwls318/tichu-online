@@ -90,6 +90,7 @@
 
 .join-box input {
   flex: 1;
+  min-width: 0;
 }
 
 .join-box button {
@@ -220,4 +221,25 @@
 
 .settings-btn-confirm:hover {
   background-color: #3a7bc8;
+}
+
+/* ── Mobile Responsive ── */
+@media (max-width: 768px) {
+  .lobby-container h1 {
+    font-size: 2rem;
+  }
+
+  .lobby-box {
+    min-width: unset;
+    width: 80vw;
+    max-width: 300px;
+    padding: 1.5rem;
+    gap: 1rem;
+  }
+
+  .settings-modal {
+    width: 85vw;
+    max-width: 320px;
+    padding: 20px;
+  }
 }

@@ -283,9 +283,9 @@ export const GameBoard: React.FC = () => {
   const hasAlreadyPassed = Object.keys(gameState.passStates[me.id] || {}).length === 3;
 
   const getTargetName = (id: string) => {
-    if (id === sortedOthers[0].id) return '왼쪽 (적)';
-    if (id === sortedOthers[1].id) return '마주본 (팀)';
-    if (id === sortedOthers[2].id) return '오른쪽 (적)';
+    if (id === sortedOthers[0].id) return '왼쪽';
+    if (id === sortedOthers[1].id) return '마주보는 자리';
+    if (id === sortedOthers[2].id) return '오른쪽';
     return '';
   };
 
@@ -293,21 +293,22 @@ export const GameBoard: React.FC = () => {
     <div className="game-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#141E26' }}>
       {/* 🚀 상단 공통 Top Bar (스코어 및 부가 기능) */}
       <div className="game-top-bar" style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '10px 20px', backgroundColor: '#0B1015', borderBottom: '1px solid #2C3E50', color: 'white', zIndex: 200
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
+        padding: '8px 12px', backgroundColor: '#0B1015', borderBottom: '1px solid #2C3E50', color: 'white', zIndex: 200,
+        gap: '6px', fontSize: 'clamp(0.7rem, 2vw, 1.1rem)'
       }}>
         <div className="scoreboard-ui" style={{
-          display: 'flex', gap: '20px', fontWeight: 'bold', fontSize: '1.1rem'
+          display: 'flex', gap: '12px', fontWeight: 'bold'
         }}>
           <div style={{ color: me.team === 'A' ? '#f1c40f' : '#ecf0f1' }}>A팀: {gameState.scores.teamA}점</div>
           <div style={{ color: me.team === 'B' ? '#f1c40f' : '#ecf0f1' }}>B팀: {gameState.scores.teamB}점</div>
         </div>
         
         {/* 설정 정보 및 방 번호 표시 */}
-        <div className="top-bar-actions" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.9rem', color: '#95a5a6' }}>목표: {gameState.settings?.targetScore || 1000}점</span>
-          <span style={{ fontSize: '0.9rem', color: '#95a5a6' }}>턴 시간: {gameState.settings?.timeLimit || 30}초</span>
-          <span style={{ fontSize: '0.9rem', color: '#95a5a6', borderLeft: '1px solid #455a64', paddingLeft: '15px' }}>방 번호: {gameState.roomId}</span>
+        <div className="top-bar-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontSize: 'clamp(0.65rem, 1.8vw, 0.9rem)' }}>
+          <span style={{ color: '#95a5a6' }}>목표: {gameState.settings?.targetScore || 1000}점</span>
+          <span style={{ color: '#95a5a6' }}>턴: {gameState.settings?.timeLimit || 30}초</span>
+          <span style={{ color: '#95a5a6' }}>방: {gameState.roomId}</span>
         </div>
       </div>
 
@@ -342,7 +343,7 @@ export const GameBoard: React.FC = () => {
             backgroundColor: 'rgba(0, 0, 0, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 500
           }}>
-            <div style={{
+            <div className="round-result-overlay" style={{
               backgroundColor: '#2c3e50', padding: '40px', borderRadius: '16px',
               textAlign: 'center', color: 'white', minWidth: '360px'
             }}>
@@ -415,20 +416,24 @@ export const GameBoard: React.FC = () => {
         <div className="opponents">
         {sortedOthers.map((p: any, idx) => (
           <div key={p.id} className={`other-player pos-${idx} ${p.tichuState === 'GRAND' ? 'called-grand' : ''}`}>
-            <div className="player-info">
+            <div className="player-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               {p.seat === gameState.currentTurn && (
                 <div style={{ 
                   backgroundColor: '#27ae60', color: 'white', padding: '2px 10px', 
                   borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', 
-                  marginBottom: '6px', display: 'inline-block'
+                  marginBottom: '2px'
                 }}>
                   현재 차례 <span style={{ color: timeLeft <= 5 ? '#e74c3c' : '#f1c40f' }}>({timeLeft}s)</span>
                 </div>
               )}
-              <br />
-              {p.nickname} ({p.team}팀)
+              <span style={{ color: p.team === me.team ? '#5aa0e8' : '#e74c3c', fontWeight: 'bold' }}>
+                {p.nickname}
+              </span>
               {p.tichuState === 'GRAND' && <span className="grand-badge">👑 라지 티츄</span>}
-              <div className="card-count">🎴 {p.hand.length}</div>
+              <div className="card-count" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <img src="/cards/Back.png" alt="card" style={{ width: '14px', height: 'auto', borderRadius: '2px' }} />
+                <span>{p.hand.length}</span>
+              </div>
             </div>
           </div>
         ))}
@@ -436,7 +441,7 @@ export const GameBoard: React.FC = () => {
 
       <div className="center-area">
         {gameState.phase === 'WAITING' && (
-          <div className="waiting-ui" style={{ backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', textAlign: 'center', minWidth: '350px', border: '2px solid #34495e' }}>
+          <div className="waiting-ui game-overlay" style={{ backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', textAlign: 'center', minWidth: '350px', border: '2px solid #34495e' }}>
             <h2 style={{ color: '#ecf0f1', marginBottom: '10px' }}>방 번호: {gameState.roomId}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '20px 0' }}>
               {gameState.players.map((p: any) => (
@@ -470,7 +475,7 @@ export const GameBoard: React.FC = () => {
         )}
 
         {gameState.phase === 'GRAND_TICHU' && (
-          <div className="passing-ui">
+          <div className="passing-ui game-overlay">
             {me.tichuState === 'GRAND' ? (
               <p>👑 라지 티츄를 선언했습니다! 다른 플레이어를 기다리는 중...</p>
             ) : me.tichuState !== null ? (
@@ -488,7 +493,7 @@ export const GameBoard: React.FC = () => {
         )}
 
         {gameState.phase === 'PASSING' && (
-          <div className="passing-ui">
+          <div className="passing-ui game-overlay">
             {hasAlreadyPassed ? (
               <p>다른 플레이어를 기다리는 중입니다...</p>
             ) : (
@@ -535,15 +540,15 @@ export const GameBoard: React.FC = () => {
         {(gameState.phase === 'PLAYING' || gameState.phase === 'FINISHED') && (
           <div className="playing-ui" style={{ textAlign: 'center', color: 'white', position: 'relative', width: '100%', height: '100%' }}>
             {showReceived && gameState.receivedPasses?.[me.id] ? (
-              <div className="received-cards-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, boxShadow: '0 10px 30px rgba(0,0,0,0.8)', border: '2px solid #2ecc71', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '90%', maxWidth: '400px' }}>
+              <div className="received-cards-overlay game-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, boxShadow: '0 10px 30px rgba(0,0,0,0.8)', border: '2px solid #2ecc71', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '90%', maxWidth: '400px' }}>
                 <h3 style={{ color: '#2ecc71', marginBottom: '20px' }}>선물 교환 완료! (받은 카드)</h3>
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '30px', width: '100%' }}>
                   {Object.entries(gameState.receivedPasses[me.id]).map(([fromId, card]: [string, any]) => {
                     const sender = gameState.players.find((p: any) => p.id === fromId);
                     return (
                       <div key={card.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#f1c40f' }}>
-                          {sender?.nickname}에게서
+                        <div style={{ marginBottom: '10px', fontSize: '0.95rem', fontWeight: 'bold', color: sender?.team === me.team ? '#5aa0e8' : '#e74c3c' }}>
+                          {sender?.nickname}
                         </div>
                         <CardComponent suit={card.suit} value={card.value} id={card.id} isSelected={false} onClick={() => {}} />
                       </div>
@@ -558,7 +563,7 @@ export const GameBoard: React.FC = () => {
                 </button>
               </div>
             ) : activeEvent?.type === 'Dog' ? (
-              <div className="dog-event-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', animation: 'fadeIn 0.3s ease-out', zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.85)', padding: '40px', borderRadius: '20px', border: '2px solid #e67e22' }}>
+              <div className="dog-event-overlay game-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', animation: 'fadeIn 0.3s ease-out', zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.85)', padding: '40px', borderRadius: '20px', border: '2px solid #e67e22' }}>
                 <h2 style={{ fontSize: '3rem', marginBottom: '10px' }}>🐶 왈왈!</h2>
                 <h3 style={{ color: '#e67e22', fontSize: '1.5rem' }}>개가 플레이되었습니다!</h3>
                 <p style={{ marginTop: '20px', fontSize: '1.2rem' }}>
@@ -566,7 +571,7 @@ export const GameBoard: React.FC = () => {
                 </p>
               </div>
             ) : gameState.cardEvent?.type === 'DragonGiveaway' && gameState.currentTurn === me.seat ? (
-              <div className="dragon-event-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, border: '2px solid #e74c3c', boxShadow: '0 10px 30px rgba(0,0,0,0.8)', width: '90%', maxWidth: '400px' }}>
+              <div className="dragon-event-overlay game-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, border: '2px solid #e74c3c', boxShadow: '0 10px 30px rgba(0,0,0,0.8)', width: '90%', maxWidth: '400px' }}>
                 <h3 style={{ color: '#e74c3c', fontSize: '1.5rem', marginBottom: '20px' }}>🐉 용이 끝났습니다! 트릭을 누구에게 주시겠습니까?</h3>
                 <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
                   {sortedOthers.filter((p: any) => p.team !== me.team).map((p: any) => (
@@ -581,14 +586,14 @@ export const GameBoard: React.FC = () => {
                 </div>
               </div>
             ) : activeEvent?.type === 'DragonReceived' ? (
-              <div className="dragon-event-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, border: '2px solid #3498db', boxShadow: '0 10px 30px rgba(0,0,0,0.8)' }}>
+              <div className="dragon-event-overlay game-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, border: '2px solid #3498db', boxShadow: '0 10px 30px rgba(0,0,0,0.8)' }}>
                 <h2 style={{ color: '#3498db', fontSize: '1.5rem', marginBottom: '10px' }}>🎁 용의 선물!</h2>
                 <p style={{ color: 'white', fontSize: '1.2rem', margin: 0 }}>
                   <strong>{gameState.players.find((p: any) => p.seat === activeEvent.fromSeat)?.nickname}</strong> 님이 <strong>{gameState.players.find((p: any) => p.seat === activeEvent.targetSeat)?.nickname}</strong> 님에게 트릭 더미를 넘겨주었습니다!
                 </p>
               </div>
             ) : showWishPrompt ? (
-              <div className="wish-prompt-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, border: '2px solid #f1c40f', boxShadow: '0 10px 30px rgba(0,0,0,0.8)', width: '90%', maxWidth: '400px' }}>
+              <div className="wish-prompt-overlay game-overlay" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', zIndex: 1000, border: '2px solid #f1c40f', boxShadow: '0 10px 30px rgba(0,0,0,0.8)', width: '90%', maxWidth: '400px' }}>
                 <h3 style={{ color: '#f1c40f', marginBottom: '20px' }}>🐦 참새의 소원: 원하는 숫자를 선택하세요</h3>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', maxWidth: '400px', margin: '0 auto' }}>
                   {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(val => {

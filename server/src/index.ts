@@ -72,7 +72,7 @@ const start = async () => {
         
         // Add 3 fake bot players
         engine.addPlayer(`bot1_${roomId}`, 'Bot_West');
-        engine.addPlayer(`bot2_${roomId}`, 'Bot_North(Partner)');
+        engine.addPlayer(`bot2_${roomId}`, 'Bot_North');
         engine.addPlayer(`bot3_${roomId}`, 'Bot_East');
         
         // Auto start

@@ -14,7 +14,7 @@
 .opponents {
   display: flex;
   justify-content: space-around;
-  height: 150px;
+  min-height: 80px;
 }
 
 .card {
@@ -33,10 +33,12 @@
 
 .other-player {
   background: rgba(255,255,255,0.05);
-  padding: 15px;
+  padding: 10px;
   border-radius: 10px;
   text-align: center;
-  min-width: 120px;
+  min-width: 80px;
+  flex: 1;
+  max-width: 200px;
 }
 
 .center-area {
@@ -105,8 +107,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 300px;
-  padding: 15px 20px;
+  width: min(300px, 80vw);
+  padding: 12px 16px;
   background: rgba(255, 255, 255, 0.1);
   border: 2px solid transparent;
   border-radius: 8px;
@@ -205,4 +207,139 @@ button:hover {
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }
   100% { transform: scale(1); }
+}
+
+/* ── Mobile Responsive ── */
+@media (max-width: 768px) {
+  .game-board {
+    padding: 8px 0 10px 0;
+  }
+
+  .opponents {
+    min-height: 60px;
+    gap: 5px;
+    padding: 0 5px;
+  }
+
+  .other-player {
+    padding: 6px;
+    min-width: 60px;
+    font-size: 0.75rem;
+  }
+
+  .other-player .player-info {
+    font-size: 0.75rem;
+  }
+
+  .card-count {
+    font-size: 0.75rem;
+  }
+
+  .grand-badge {
+    font-size: 0.65rem;
+    padding: 2px 5px;
+    margin-left: 4px;
+  }
+
+  .my-area {
+    padding: 0 0 10px 0;
+  }
+
+  .my-status {
+    height: 30px;
+    margin-bottom: 10px;
+    padding-left: 10px;
+  }
+
+  .grand-badge-self {
+    font-size: 0.85rem;
+    padding: 4px 8px;
+  }
+
+  .my-hand {
+    gap: 12px 2px;
+  }
+
+  .card {
+    width: clamp(36px, 10vw, 70px) !important;
+    height: auto !important;
+  }
+
+  .card:hover {
+    transform: translateY(-8px);
+  }
+
+  .card.selected {
+    transform: translateY(-16px);
+  }
+
+  .card-badge {
+    font-size: 0.55rem;
+    padding: 1px 4px;
+    top: -10px;
+  }
+
+  .passing-targets {
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .target-slot {
+    width: min(260px, 75vw);
+    padding: 10px 14px;
+    font-size: 0.85rem;
+  }
+
+  .pass-btn {
+    margin-top: 12px;
+    padding: 10px 20px;
+    font-size: 0.95rem;
+  }
+
+  .passing-ui h3, .waiting-ui h3 {
+    font-size: 1rem;
+  }
+
+  .passing-ui p {
+    font-size: 0.9rem;
+  }
+
+  .game-overlay {
+    padding: 16px !important;
+    width: 92% !important;
+    max-width: none !important;
+    min-width: unset !important;
+    box-sizing: border-box;
+  }
+
+  .game-overlay h2 {
+    font-size: 1.2rem !important;
+  }
+
+  .game-overlay h3 {
+    font-size: 1rem !important;
+  }
+
+  .game-overlay p {
+    font-size: 0.85rem !important;
+  }
+
+  .game-overlay button {
+    font-size: 0.9rem !important;
+    padding: 8px 14px !important;
+  }
+
+  .waiting-ui {
+    min-width: unset !important;
+    width: 90vw !important;
+    max-width: 400px !important;
+    padding: 20px !important;
+  }
+
+  .round-result-overlay {
+    padding: 20px !important;
+    min-width: unset !important;
+    width: 90% !important;
+    max-width: 360px !important;
+  }
 }
