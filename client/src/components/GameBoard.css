@@ -75,13 +75,13 @@
 
 .my-hand {
   display: flex;
-  flex-wrap: wrap; /* 카드가 창 너비 초과 시 자연스럽게 줄바꿈 */
-  justify-content: center; /* 무조건 화면 정중앙에 배치 */
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   width: 100%;
-  padding: 0; /* 좌우 여백 일체 제거 */
+  padding: 0 15px; /* 양옆에 약간의 패딩 추가 */
   box-sizing: border-box;
-  gap: 20px 5px; /* 줄바꿈 시 위아래 간격 20px, 카드간 간격 5px로 예쁘게 배치 */
+  gap: 20px 5px;
 }
 
 .card-wrapper {
@@ -146,17 +146,19 @@
 
 .card-badge {
   position: absolute;
-  top: -15px;
+  top: -12px;           /* 카드 완전 위로 올라가게 */
   left: 50%;
   transform: translateX(-50%);
-  background: #2ecc71;
-  color: white;
-  font-size: 0.7rem;
-  padding: 2px 6px;
+  background: #f1c40f;    /* 게임판 배경(어두운 색)과 확연히 대비되는 밝은 노란색 */
+  color: #111;            /* 밝은 배경에 맞춰 글씨를 검은색으로 변경 */
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 3px 8px;
   border-radius: 4px;
   white-space: nowrap;
   z-index: 30;           /* 태그가 최상단에 오도록 z-index 부여 */
   pointer-events: none;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5); /* 그림자를 조금 더 진하게 */
 }
 
 .pass-btn {
@@ -258,11 +260,27 @@ button:hover {
 
   .my-hand {
     gap: 12px 2px;
+    padding: 0 8px;
   }
 
-  .card {
-    width: clamp(36px, 10vw, 70px) !important;
+  .card-wrapper {
+    /* 여백(100%)에서 카드 간격(2px * 6 = 12px) 및 브라우저 보정치 2px 추가로 뺌. */
+    width: calc((100% - 14px) / 7);
+  }
+
+  .card-wrapper .card,
+  .overlay-card-wrapper .card {
+    width: 100% !important;
     height: auto !important;
+  }
+  
+  .overlay-card-wrapper .card-icon {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+  }
+  
+  .overlay-card-wrapper .card-value {
+    font-size: 2.4rem;
   }
 
   .card:hover {
@@ -274,9 +292,10 @@ button:hover {
   }
 
   .card-badge {
-    font-size: 0.55rem;
+    font-size: 0.75rem;
     padding: 1px 4px;
-    top: -10px;
+    top: -22px;
+    font-weight: 600;
   }
 
   .passing-targets {

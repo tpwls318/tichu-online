@@ -546,7 +546,7 @@ export const GameBoard: React.FC = () => {
                   {Object.entries(gameState.receivedPasses[me.id]).map(([fromId, card]: [string, any]) => {
                     const sender = gameState.players.find((p: any) => p.id === fromId);
                     return (
-                      <div key={card.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div key={card.id} className="overlay-card-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '28%' }}>
                         <div style={{ marginBottom: '10px', fontSize: '0.95rem', fontWeight: 'bold', color: sender?.team === me.team ? '#5aa0e8' : '#e74c3c' }}>
                           {sender?.nickname}
                         </div>
