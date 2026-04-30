@@ -415,17 +415,8 @@ export const GameBoard: React.FC = () => {
       <div className="game-board" style={{ flex: 1, height: '100%' }}>
         <div className="opponents">
         {sortedOthers.map((p: any, idx) => (
-          <div key={p.id} className={`other-player pos-${idx} ${p.tichuState === 'GRAND' ? 'called-grand' : ''}`}>
+          <div key={p.id} className={`other-player pos-${idx} ${p.tichuState === 'GRAND' ? 'called-grand' : ''}`} style={{ position: 'relative' }}>
             <div className="player-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              {p.seat === gameState.currentTurn && (
-                <div style={{ 
-                  backgroundColor: '#27ae60', color: 'white', padding: '2px 10px', 
-                  borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', 
-                  marginBottom: '2px'
-                }}>
-                  현재 차례 <span style={{ color: timeLeft <= 5 ? '#e74c3c' : '#f1c40f' }}>({timeLeft}s)</span>
-                </div>
-              )}
               <span style={{ color: p.team === me.team ? '#5aa0e8' : '#e74c3c', fontWeight: 'bold' }}>
                 {p.nickname}
               </span>
@@ -435,6 +426,19 @@ export const GameBoard: React.FC = () => {
                 <span>{p.hand.length}</span>
               </div>
             </div>
+            {p.seat === gameState.currentTurn && (
+              <div style={{ 
+                position: 'absolute',
+                bottom: '-28px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: '#27ae60', color: 'white', padding: '2px 10px', 
+                borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', 
+                whiteSpace: 'nowrap'
+              }}>
+                현재 차례 <span style={{ color: timeLeft <= 5 ? '#e74c3c' : '#f1c40f' }}>({timeLeft}s)</span>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -484,8 +488,8 @@ export const GameBoard: React.FC = () => {
               <>
                 <h3>라지 티츄를 선언하시겠습니까? (현재 8장)</h3>
                 <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '20px' }}>
-                  <button onClick={() => answerGrandTichu(true)} style={{ backgroundColor: '#e74c3c' }}>라지 티츄 선언 (+200)</button>
-                  <button onClick={() => answerGrandTichu(false)} style={{ backgroundColor: '#95a5a6' }}>패스</button>
+                  <button onClick={() => answerGrandTichu(true)} style={{ backgroundColor: '#e74c3c' }}>라지 티츄 (+200)</button>
+                  <button onClick={() => answerGrandTichu(false)} style={{ backgroundColor: '#2ecc71' }}>패스</button>
                 </div>
               </>
             )}
