@@ -157,7 +157,7 @@ export class TichuEngine {
     if (this.state.phase !== 'PLAYING') return false;
     
     const player = this.state.players.find(p => p.id === playerId);
-    if (!player || player.hasPlayedFirstCard || player.tichuState !== null) {
+    if (!player || player.hasPlayedFirstCard || player.tichuState === 'GRAND' || player.tichuState === 'SMALL') {
       return false;
     }
 

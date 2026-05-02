@@ -655,7 +655,7 @@ export const GameBoard: React.FC = () => {
                       <div style={{ marginBottom: '10px', color: '#f1c40f' }}>
                         {gameState.players.find((p: any) => p.id === delayedLastTrick?.playerId)?.nickname}의 {delayedLastTrick.type}
                       </div>
-                      <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', width: '100%' }}>
+                      <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', width: '100%', flexWrap: 'wrap' }}>
                         {delayedLastTrick.cards.map((card: any) => (
                           <CardComponent suit={card.suit} value={card.value} id={card.id} isSelected={false} disableHover={true} onClick={() => {}} />
                         ))}

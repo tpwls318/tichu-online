@@ -283,6 +283,15 @@ const start = async () => {
         }
       });
 
+      socket.on('callSmallTichu', ({ roomId }) => {
+        const engine = roomManager.getRoom(roomId);
+        if (!engine) return;
+
+        if (engine.callSmallTichu(socket.id)) {
+          io.to(roomId).emit('gameStateUpdate', engine.state);
+        }
+      });
+
       socket.on('passCards', ({ roomId, targetMap }) => {
         const engine = roomManager.getRoom(roomId);
         if (!engine) return;
