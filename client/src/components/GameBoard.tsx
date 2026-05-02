@@ -672,6 +672,8 @@ export const GameBoard: React.FC = () => {
                   )}
                 </div>
 
+
+
                 {/* 내 턴이거나 폭탄을 들고 있을 때 컨트롤 표시 (게임 중일 때만) */}
                 {gameState.phase === 'PLAYING' && (gameState.currentTurn === me.seat || (selectedPlayCards.length >= 4 && isBomb(selectedPlayCards))) && (
                   <div className="play-controls" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', zIndex: 10, position: 'relative', width: '100%' }}>
@@ -741,15 +743,6 @@ export const GameBoard: React.FC = () => {
                         패스
                       </button>
                     )}
-                    {gameState.phase === 'PLAYING' && !me.hasPlayedFirstCard && me.tichuState === null && (
-                      <button 
-                        className="tichu-btn"
-                        style={{ padding: '10px 20px', backgroundColor: '#f1c40f', color: '#c0392b', border: 'none', borderRadius: '5px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}
-                        onClick={callSmallTichu}
-                      >
-                        티츄 (+100)
-                      </button>
-                      )}
                     </div>
                   </div>
                 )}
@@ -760,8 +753,18 @@ export const GameBoard: React.FC = () => {
       </div>
 
       <div className="my-area">
-        <div className="my-status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginBottom: '25px', paddingLeft: '10px' }}>
+        <div className="my-status" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: '20px', paddingLeft: '10px', gap: '10px', width: '100%' }}>
           {me.tichuState === 'GRAND' && <div className="grand-badge-self" style={{ marginTop: '0px' }}>👑 라지 티츄</div>}
+          {me.tichuState === 'SMALL' && <div className="grand-badge-self" style={{ marginTop: '0px', backgroundColor: '#e67e22', color: '#fff' }}>🔥 스몰 티츄</div>}
+          {gameState.phase === 'PLAYING' && me.hand.length === 14 && me.tichuState !== 'GRAND' && me.tichuState !== 'SMALL' && (
+            <button 
+              className="tichu-btn"
+              style={{ padding: '6px 12px', backgroundColor: '#f1c40f', color: '#c0392b', border: 'none', borderRadius: '6px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(241,196,15,0.4)' }}
+              onClick={callSmallTichu}
+            >
+              스몰 티츄 (+100)
+            </button>
+          )}
         </div>
         <div className="my-hand">
           {sortedHand.map((card: any) => {
