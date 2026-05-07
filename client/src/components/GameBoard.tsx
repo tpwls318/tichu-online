@@ -5,7 +5,7 @@ import { useGameStore } from '../store/useGameStore';
 import './GameBoard.css';
 
 export const GameBoard: React.FC = () => {
-  const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick, toggleReady, callSmallTichu, playAgain, leaveRoom } = useGameStore();
+  const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick, toggleReady, callSmallTichu, playAgain, leaveRoom, updateNickname } = useGameStore();
   const [passingTargets, setPassingTargets] = useState<{ [targetId: string]: string }>({});
   const [showReceived, setShowReceived] = useState(false);
   const hasShownReceived = useRef(false);
@@ -15,6 +15,18 @@ export const GameBoard: React.FC = () => {
   const [showWishPrompt, setShowWishPrompt] = useState(false);
   const [delayedLastTrick, setDelayedLastTrick] = useState<any | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
+
+  const [needsNickname, setNeedsNickname] = useState(() => localStorage.getItem('tichu_needs_nickname') === 'true');
+  const [tempNickname, setTempNickname] = useState(() => localStorage.getItem('tichu_nickname') || '');
+
+  const handleNicknameSubmit = () => {
+    if (tempNickname.trim()) {
+      updateNickname(tempNickname.trim());
+      localStorage.setItem('tichu_nickname', tempNickname.trim());
+      localStorage.removeItem('tichu_needs_nickname');
+      setNeedsNickname(false);
+    }
+  };
 
   const timeLimit = gameState?.settings?.timeLimit || 30;
   const [timeLeft, setTimeLeft] = useState(timeLimit);
@@ -413,6 +425,44 @@ export const GameBoard: React.FC = () => {
       })()}
 
       <div className="game-board" style={{ flex: 1, height: '100%' }}>
+        {needsNickname && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: '#2c3e50', padding: '30px', borderRadius: '15px',
+              textAlign: 'center', color: 'white', minWidth: '320px', border: '2px solid #34495e'
+            }}>
+              <h2 style={{ marginBottom: '20px', color: '#f1c40f' }}>사용할 닉네임을 설정해주세요</h2>
+              <input 
+                type="text" 
+                value={tempNickname}
+                onChange={(e) => setTempNickname(e.target.value)}
+                placeholder="닉네임 입력"
+                style={{
+                  width: '100%', padding: '12px', borderRadius: '8px', border: 'none',
+                  fontSize: '1.2rem', marginBottom: '20px', boxSizing: 'border-box', textAlign: 'center'
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleNicknameSubmit()}
+                autoFocus
+              />
+              <button 
+                onClick={handleNicknameSubmit}
+                disabled={!tempNickname.trim()}
+                style={{
+                  width: '100%', padding: '12px', backgroundColor: '#3498db', color: 'white',
+                  border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: tempNickname.trim() ? 'pointer' : 'not-allowed',
+                  opacity: tempNickname.trim() ? 1 : 0.5, fontWeight: 'bold'
+                }}
+              >
+                설정 완료
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="opponents">
         {sortedOthers.map((p: any, idx) => (
           <div key={p.id} className={`other-player pos-${idx} ${p.tichuState === 'GRAND' ? 'called-grand' : ''}`} style={{ position: 'relative' }}>
@@ -447,6 +497,25 @@ export const GameBoard: React.FC = () => {
         {gameState.phase === 'WAITING' && (
           <div className="waiting-ui game-overlay" style={{ backgroundColor: 'rgba(26, 37, 47, 0.95)', padding: '30px', borderRadius: '15px', textAlign: 'center', minWidth: '350px', border: '2px solid #34495e' }}>
             <h2 style={{ color: '#ecf0f1', marginBottom: '10px' }}>방 번호: {gameState.roomId}</h2>
+            <div style={{ marginBottom: '20px' }}>
+              <button
+                onClick={() => {
+                  const inviteLink = `${window.location.origin}/?roomId=${gameState.roomId}`;
+                  navigator.clipboard.writeText(inviteLink).then(() => {
+                    const btn = document.getElementById('copy-link-btn');
+                    if (btn) {
+                      const originalText = btn.innerText;
+                      btn.innerText = '✅ 복사 완료!';
+                      setTimeout(() => { btn.innerText = originalText; }, 2000);
+                    }
+                  });
+                }}
+                id="copy-link-btn"
+                style={{ padding: '8px 16px', backgroundColor: '#8e44ad', color: 'white', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                🔗 초대 링크 복사
+              </button>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '20px 0' }}>
               {gameState.players.map((p: any) => (
                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: '#34495e', borderRadius: '8px', alignItems: 'center' }}>

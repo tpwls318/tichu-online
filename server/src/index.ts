@@ -61,6 +61,15 @@ const start = async () => {
         }
       });
 
+      socket.on('updateNickname', ({ roomId, newNickname }) => {
+        const engine = roomManager.getRoom(roomId);
+        if (!engine) return;
+
+        if (engine.updateNickname(socket.id, newNickname)) {
+          io.to(roomId).emit('gameStateUpdate', engine.state);
+        }
+      });
+
       socket.on('startSoloTest', ({ nickname, settings }) => {
         // Create a room
         const roomId = roomManager.createRoom(settings);

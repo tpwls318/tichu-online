@@ -33,6 +33,13 @@ export class TichuEngine {
   addPlayer(id: string, nickname: string) {
     if (this.state.players.length >= 4) return false;
     
+    // Prevent duplicate entries for the same socket ID
+    const existingPlayer = this.state.players.find(p => p.id === id);
+    if (existingPlayer) {
+      existingPlayer.nickname = nickname;
+      return true;
+    }
+
     const team = this.state.players.length % 2 === 0 ? 'A' : 'B';
     const player: Player = {
       id,
@@ -48,6 +55,15 @@ export class TichuEngine {
     
     this.state.players.push(player);
     return true;
+  }
+
+  updateNickname(id: string, newNickname: string) {
+    const player = this.state.players.find(p => p.id === id);
+    if (player) {
+      player.nickname = newNickname;
+      return true;
+    }
+    return false;
   }
 
   removePlayer(id: string) {

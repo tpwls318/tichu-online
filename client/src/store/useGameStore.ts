@@ -11,6 +11,7 @@ interface GameStore {
   connect: () => void;
   createRoom: (nickname: string, settings?: { targetScore: number, timeLimit: number }) => void;
   joinRoom: (nickname: string, roomId: string) => void;
+  updateNickname: (newNickname: string) => void;
   startSoloTest: (nickname: string, settings?: { targetScore: number, timeLimit: number }) => void;
   answerGrandTichu: (callGrand: boolean) => void;
   passCards: (targetMap: { [targetId: string]: string }) => void;
@@ -57,6 +58,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   joinRoom: (nickname, roomId) => {
     get().socket?.emit('joinRoom', { nickname, roomId });
+  },
+
+  updateNickname: (newNickname) => {
+    const roomId = get().gameState?.roomId;
+    if (roomId) {
+      get().socket?.emit('updateNickname', { roomId, newNickname });
+    }
   },
 
   startSoloTest: (nickname, settings) => {
