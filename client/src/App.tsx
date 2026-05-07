@@ -5,7 +5,7 @@ import { useGameStore } from './store/useGameStore'
 import './App.css'
 
 function App() {
-  const { socket, gameState, connect, createRoom, joinRoom, startSoloTest, error } = useGameStore()
+  const { socket, gameState, connect, createRoom, joinRoom, startSoloTest, error, setNeedsNickname } = useGameStore()
 
   useEffect(() => {
     connect()
@@ -17,7 +17,7 @@ function App() {
       const inviteRoomId = urlParams.get('roomId');
       if (inviteRoomId) {
         const tempNickname = `Guest_${Math.floor(Math.random() * 10000)}`;
-        localStorage.setItem('tichu_needs_nickname', 'true');
+        setNeedsNickname(true);
         joinRoom(tempNickname, inviteRoomId);
       }
     }

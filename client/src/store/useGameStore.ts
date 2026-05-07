@@ -8,6 +8,8 @@ interface GameStore {
   gameState: any | null;
   roomId: string | null;
   error: string | null;
+  needsNickname: boolean;
+  setNeedsNickname: (val: boolean) => void;
   connect: () => void;
   createRoom: (nickname: string, settings?: { targetScore: number, timeLimit: number }) => void;
   joinRoom: (nickname: string, roomId: string) => void;
@@ -30,6 +32,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   gameState: null,
   roomId: null,
   error: null,
+  needsNickname: false,
+
+  setNeedsNickname: (val: boolean) => set({ needsNickname: val }),
 
   connect: () => {
     if (get().socket) return;

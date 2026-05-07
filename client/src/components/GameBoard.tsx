@@ -5,7 +5,7 @@ import { useGameStore } from '../store/useGameStore';
 import './GameBoard.css';
 
 export const GameBoard: React.FC = () => {
-  const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick, toggleReady, callSmallTichu, playAgain, leaveRoom, updateNickname } = useGameStore();
+  const { gameState, socket, passCards, answerGrandTichu, playCards, passTrick, toggleReady, callSmallTichu, playAgain, leaveRoom, updateNickname, needsNickname, setNeedsNickname } = useGameStore();
   const [passingTargets, setPassingTargets] = useState<{ [targetId: string]: string }>({});
   const [showReceived, setShowReceived] = useState(false);
   const hasShownReceived = useRef(false);
@@ -16,14 +16,12 @@ export const GameBoard: React.FC = () => {
   const [delayedLastTrick, setDelayedLastTrick] = useState<any | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
 
-  const [needsNickname, setNeedsNickname] = useState(() => localStorage.getItem('tichu_needs_nickname') === 'true');
   const [tempNickname, setTempNickname] = useState(() => localStorage.getItem('tichu_nickname') || '');
 
   const handleNicknameSubmit = () => {
     if (tempNickname.trim()) {
       updateNickname(tempNickname.trim());
       localStorage.setItem('tichu_nickname', tempNickname.trim());
-      localStorage.removeItem('tichu_needs_nickname');
       setNeedsNickname(false);
     }
   };
@@ -429,7 +427,7 @@ export const GameBoard: React.FC = () => {
           <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 1000
+            zIndex: 999999
           }}>
             <div style={{
               backgroundColor: '#2c3e50', padding: '30px', borderRadius: '15px',
