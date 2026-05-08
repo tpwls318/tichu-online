@@ -318,7 +318,7 @@ export const GameBoard: React.FC = () => {
         <div className="top-bar-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontSize: 'clamp(0.65rem, 1.8vw, 0.9rem)' }}>
           <span style={{ color: '#95a5a6' }}>목표: {gameState.settings?.targetScore || 1000}점</span>
           <span style={{ color: '#95a5a6' }}>턴: {gameState.settings?.timeLimit || 30}초</span>
-          <span style={{ color: '#95a5a6' }}>방: {gameState.roomId}</span>
+          <span style={{ color: '#95a5a6' }}>방: {gameState.roomName || gameState.roomId}</span>
         </div>
       </div>
 
@@ -328,7 +328,8 @@ export const GameBoard: React.FC = () => {
         const targetScore = gameState.settings?.targetScore || 1000;
         const aWon = gameState.scores.teamA >= targetScore;
         const bWon = gameState.scores.teamB >= targetScore;
-        const gameEnded = aWon || bWon;
+        const isForfeit = gameState.roundResult.message.includes('[기권 패배]');
+        const gameEnded = aWon || bWon || isForfeit;
 
         let resultMessage = gameState.roundResult.message;
         if (gameEnded) {
@@ -355,9 +356,9 @@ export const GameBoard: React.FC = () => {
           }}>
             <div className="round-result-overlay" style={{
               backgroundColor: '#2c3e50', padding: '40px', borderRadius: '16px',
-              textAlign: 'center', color: 'white', minWidth: '360px'
+              textAlign: 'center', color: 'white', width: '90%', maxWidth: '400px', boxSizing: 'border-box'
             }}>
-              <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: gameEnded ? '#f1c40f' : 'white' }}>
+              <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: gameEnded ? '#f1c40f' : 'white', wordBreak: 'keep-all' }}>
                 {resultMessage}
               </h2>
               
@@ -408,12 +409,14 @@ export const GameBoard: React.FC = () => {
                       </button>
                     </>
                   ) : (
-                    <button 
-                      onClick={leaveRoom}
-                      style={{ padding: '12px 24px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
-                    >
-                      방 나가기
-                    </button>
+                    <>
+                      <button 
+                        onClick={leaveRoom}
+                        style={{ padding: '12px 24px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        처음화면으로 (나가기)
+                      </button>
+                    </>
                   )}
                 </div>
               )}
@@ -424,16 +427,23 @@ export const GameBoard: React.FC = () => {
 
       <div className="game-board" style={{ flex: 1, height: '100%' }}>
         {needsNickname && (
-          <div style={{
+          <div 
+            onClick={(e) => { if (e.target === e.currentTarget) setNeedsNickname(false); }}
+            style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 999999
           }}>
             <div style={{
               backgroundColor: '#2c3e50', padding: '30px', borderRadius: '15px',
-              textAlign: 'center', color: 'white', minWidth: '320px', border: '2px solid #34495e'
+              textAlign: 'center', color: 'white', width: '90%', maxWidth: '320px', boxSizing: 'border-box', border: '2px solid #34495e',
+              position: 'relative'
             }}>
-              <h2 style={{ marginBottom: '20px', color: '#f1c40f' }}>사용할 닉네임을 설정해주세요</h2>
+              <button
+                onClick={() => setNeedsNickname(false)}
+                style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: '#95a5a6', fontSize: '1.4rem', cursor: 'pointer', padding: '0', lineHeight: '1' }}
+              >✕</button>
+              <h2 style={{ marginBottom: '20px', color: '#f1c40f', fontSize: '1.4rem', wordBreak: 'keep-all' }}>사용할 닉네임을 설정해주세요</h2>
               <input 
                 type="text" 
                 value={tempNickname}
@@ -467,6 +477,7 @@ export const GameBoard: React.FC = () => {
             <div className="player-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <span style={{ color: p.team === me.team ? '#5aa0e8' : '#e74c3c', fontWeight: 'bold' }}>
                 {p.nickname}
+                {p.isDisconnected && <span style={{ marginLeft: '4px', color: '#e74c3c', fontSize: '0.8rem' }}>🔴</span>}
               </span>
               {p.tichuState === 'GRAND' && <span className="grand-badge">👑 라지 티츄</span>}
               <div className="card-count" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -517,7 +528,18 @@ export const GameBoard: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '20px 0' }}>
               {gameState.players.map((p: any) => (
                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: '#34495e', borderRadius: '8px', alignItems: 'center' }}>
-                    <span style={{ color: 'white', fontWeight: 'bold' }}>{p.nickname}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: 'white', fontWeight: 'bold' }}>{p.nickname}</span>
+                      {p.id === me?.id && (
+                        <button 
+                          onClick={() => setNeedsNickname(true)}
+                          style={{ padding: '0', backgroundColor: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          title="닉네임 변경"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                        </button>
+                      )}
+                    </div>
                     <span style={{ color: p.isReady ? '#2ecc71' : '#e74c3c', fontWeight: 'bold' }}>{p.isReady ? '레디 완료' : '준비 중'}</span>
                  </div>
               ))}

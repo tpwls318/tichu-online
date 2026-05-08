@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, memo } from 'react';
 import './Lobby.css';
 import { CustomSelect } from './CustomSelect';
+import { getUserId } from '../utils/userId';
 
 interface SettingsModalProps {
   onConfirm: (settings: { targetScore: number; timeLimit: number }) => void;
@@ -63,13 +64,15 @@ const SettingsModal = memo<SettingsModalProps>(({ onConfirm, onCancel, showTimeL
 });
 
 interface LobbyProps {
+  roomList?: any[];
+  getRooms?: () => void;
   onJoin: (nickname: string, roomId: string) => void;
   onCreate: (nickname: string, settings?: { targetScore: number; timeLimit: number }) => void;
   onSoloTest: (nickname: string, settings?: { targetScore: number; timeLimit: number }) => void;
 }
 
-export const Lobby: React.FC<LobbyProps> = ({ onJoin, onCreate, onSoloTest }) => {
-  const [nickname, setNickname] = useState('');
+export const Lobby: React.FC<LobbyProps> = ({ roomList = [], getRooms, onJoin, onCreate, onSoloTest }) => {
+  const [nickname, setNickname] = useState(() => localStorage.getItem('tichu_nickname') || '');
   const [roomId, setRoomId] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [pendingAction, setPendingAction] = useState<'CREATE' | 'SOLO' | null>(null);
@@ -136,13 +139,71 @@ export const Lobby: React.FC<LobbyProps> = ({ onJoin, onCreate, onSoloTest }) =>
         </div>
       </div>
 
-      <div className="solo-action">
+      <div className="solo-action" style={{ marginBottom: '20px' }}>
         <button
           disabled={!nickname}
           onClick={() => handleOpenSettings('SOLO')}
         >
           빠른 테스트 (봇 3명 추가)
         </button>
+      </div>
+
+      <div className="room-list-container lobby-box">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          <h3 style={{ margin: 0, color: 'white' }}>현재 열려있는 방</h3>
+          <button onClick={() => getRooms && getRooms()} style={{ padding: '5px 10px', fontSize: '0.9rem', backgroundColor: '#2c3e50', border: '1px solid #1abc9c', borderRadius: '5px', color: '#1abc9c', cursor: 'pointer' }}>새로고침</button>
+        </div>
+        
+        {roomList.length === 0 ? (
+          <p style={{ color: '#bdc3c7', textAlign: 'center', margin: '20px 0' }}>개설된 방이 없습니다.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '200px', overflowY: 'auto' }}>
+            {roomList.map(room => {
+              const myUserId = getUserId();
+              const isDisconnectedMe = room.disconnectedUserIds?.includes(myUserId);
+              const canJoin = isDisconnectedMe || (room.playerCount < 4 && room.phase === 'WAITING');
+              
+              let btnText = '참여';
+              let btnColor = '#2ecc71';
+              
+              if (isDisconnectedMe) {
+                btnText = '재연결';
+                btnColor = '#f39c12';
+              } else if (room.playerCount >= 4) {
+                btnText = '만원';
+                btnColor = '#7f8c8d';
+              } else if (room.phase !== 'WAITING') {
+                btnText = '진행 중';
+                btnColor = '#7f8c8d';
+              }
+
+              return (
+                <div key={room.roomId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#2c3e50', padding: '12px 15px', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ color: '#ecf0f1', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                      {room.roomName || `방 ${room.roomId}`}
+                    </div>
+                    <div style={{ color: '#bdc3c7', fontSize: '0.85rem', marginTop: '4px' }}>
+                      인원: {room.playerCount}/4 
+                      {room.activePlayerCount < room.playerCount && <span style={{ color: '#e74c3c' }}> (오프라인 {room.playerCount - room.activePlayerCount}명)</span>}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => onJoin(nickname, room.roomId)}
+                    disabled={!nickname || !canJoin}
+                    style={{ 
+                      padding: '8px 12px', 
+                      backgroundColor: canJoin ? btnColor : '#7f8c8d',
+                      color: 'white', border: 'none', borderRadius: '5px', cursor: (!nickname || !canJoin) ? 'not-allowed' : 'pointer' 
+                    }}
+                  >
+                    {btnText}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

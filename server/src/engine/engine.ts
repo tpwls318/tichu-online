@@ -9,11 +9,16 @@ export class TichuEngine {
   private grandTichuResponses: { [playerId: string]: boolean } = {};
   private passCount: number = 0;
   private finishedPlayers: string[] = [];
+  public turnTimer: NodeJS.Timeout | null = null;
+  public onTimerExpire: (() => void) | null = null;
+  public disconnectTimers: { [playerId: string]: NodeJS.Timeout } = {};
+  public onGameEnd: (() => void) | null = null;
 
-  constructor(roomId: string, settings?: { targetScore: number; timeLimit: number }) {
+  constructor(roomId: string, roomName: string, settings?: { targetScore: number; timeLimit: number }) {
     this.deck = new TichuDeck();
     this.state = {
       roomId,
+      roomName,
       players: [],
       phase: 'WAITING',
       currentTurn: 0,
@@ -30,7 +35,24 @@ export class TichuEngine {
     };
   }
   
-  addPlayer(id: string, nickname: string) {
+  addPlayer(id: string, nickname: string, userId: string = '') {
+    // Reconnection logic: check if there's a disconnected player with the same userId
+    if (userId) {
+      const disconnectedPlayer = this.state.players.find(p => p.userId === userId && p.isDisconnected);
+      if (disconnectedPlayer) {
+        disconnectedPlayer.id = id; // Update socket ID
+        disconnectedPlayer.nickname = nickname;
+        disconnectedPlayer.isDisconnected = false;
+        
+        // Clear forfeit timer
+        if (this.disconnectTimers[disconnectedPlayer.id]) {
+          clearTimeout(this.disconnectTimers[disconnectedPlayer.id]);
+          delete this.disconnectTimers[disconnectedPlayer.id];
+        }
+        return true;
+      }
+    }
+
     if (this.state.players.length >= 4) return false;
     
     // Prevent duplicate entries for the same socket ID
@@ -43,6 +65,7 @@ export class TichuEngine {
     const team = this.state.players.length % 2 === 0 ? 'A' : 'B';
     const player: Player = {
       id,
+      userId: userId || `temp_${Math.random()}`,
       nickname,
       hand: [],
       collectedCards: [],
@@ -50,7 +73,8 @@ export class TichuEngine {
       isReady: false,
       team,
       seat: this.state.players.length,
-      hasPlayedFirstCard: false
+      hasPlayedFirstCard: false,
+      isDisconnected: false
     };
     
     this.state.players.push(player);
@@ -69,20 +93,71 @@ export class TichuEngine {
   removePlayer(id: string) {
     const playerIndex = this.state.players.findIndex(p => p.id === id);
     if (playerIndex !== -1) {
-      this.state.players.splice(playerIndex, 1);
-      
-      // Reassign seats to remaining players
-      this.state.players.forEach((p, index) => {
-        p.seat = index;
-      });
-      
-      // If the game was running and someone leaves, we might need to reset to WAITING
-      // but for now we'll just return to waiting room unconditionally if we lose a player
-      if (this.state.phase !== 'WAITING') {
-        this.returnToWaitingRoom();
+      if (this.state.phase === 'WAITING' || this.state.phase === 'FINISHED') {
+        // If the game hasn't really started, or it's completely finished, we can remove them.
+        this.state.players.splice(playerIndex, 1);
+        
+        // Reassign seats to remaining players
+        this.state.players.forEach((p, index) => {
+          p.seat = index;
+        });
+      } else {
+        // Game is running, mark as disconnected
+        const player = this.state.players[playerIndex];
+        player.isDisconnected = true;
+        
+        // Start 3-minute forfeit timer
+        this.disconnectTimers[player.id] = setTimeout(() => {
+          if (this.state.phase !== 'FINISHED' && this.state.phase !== 'WAITING') {
+            this.state.phase = 'FINISHED';
+            this.state.roundResult = {
+              teamADelta: 0,
+              teamBDelta: 0,
+              teamATotal: this.state.scores.teamA,
+              teamBTotal: this.state.scores.teamB,
+              message: `[기권 패배] ${player.nickname} 님이 3분 동안 접속하지 않아 게임이 강제 종료되었습니다.`
+            };
+            if (this.onGameEnd) {
+              this.onGameEnd();
+            }
+          }
+        }, 3 * 60 * 1000);
+
+        // If it's their turn, auto-pass after 10s
+        if (this.state.phase === 'PLAYING' && this.state.currentTurn === player.seat) {
+          this.startTurnTimer(player.id, 10);
+        }
       }
     }
-    return this.state.players.length;
+    
+    // Return active (non-disconnected) players length for determining if room is completely empty
+    return this.state.players.filter(p => !p.isDisconnected).length;
+  }
+  clearTurnTimer() {
+    if (this.turnTimer) {
+      clearTimeout(this.turnTimer);
+      this.turnTimer = null;
+    }
+  }
+
+  startTurnTimer(playerId: string, overrideSeconds?: number) {
+    this.clearTurnTimer();
+    
+    if (this.state.phase !== 'PLAYING') return;
+    
+    const player = this.state.players.find(p => p.id === playerId);
+    if (!player || this.state.currentTurn !== player.seat) return;
+
+    let seconds = overrideSeconds || this.state.settings?.timeLimit || 30;
+    if (player.isDisconnected) {
+      seconds = 10; // Offline players auto-pass after 10 seconds
+    }
+
+    this.turnTimer = setTimeout(() => {
+      if (this.onTimerExpire) {
+        this.onTimerExpire();
+      }
+    }, seconds * 1000);
   }
 
   startGame() {
@@ -256,6 +331,7 @@ export class TichuEngine {
     const sparrowPlayer = this.state.players.find(p => p.hand.find(c => c.id === 'Sparrow'));
     if (sparrowPlayer) {
       this.state.currentTurn = sparrowPlayer.seat;
+      this.startTurnTimer(sparrowPlayer.id);
     }
   }
 
@@ -361,6 +437,12 @@ export class TichuEngine {
       this.state.lastTrick = null; // Dog starts a fresh trick for the partner
       this.passCount = 0;
       
+      // Delay timer start by the duration of the Dog animation
+      setTimeout(() => {
+        const nextPlayer = this.state.players.find(p => p.seat === nextTurnSeat);
+        if (nextPlayer) this.startTurnTimer(nextPlayer.id);
+      }, 2500);
+
       return true; // Return immediately, trick isn't saved, it just passes lead basically
     }
 
@@ -455,6 +537,7 @@ export class TichuEngine {
           const nextP = this.state.players.find(x => x.seat === t);
           if (nextP && nextP.hand.length > 0) {
             this.state.currentTurn = t;
+            this.startTurnTimer(nextP.id);
             break;
           }
           t = (t + 3) % 4;
@@ -462,6 +545,7 @@ export class TichuEngine {
         }
       } else if (winner) {
         this.state.currentTurn = winner.seat;
+        this.startTurnTimer(winner.id);
       }
     }
 
@@ -486,6 +570,7 @@ export class TichuEngine {
       const p = this.state.players.find(p => p.seat === nextTurn);
       if (p && p.hand.length > 0) {
         this.state.currentTurn = nextTurn;
+        this.startTurnTimer(p.id);
         return;
       }
       nextTurn = (nextTurn + 3) % 4;
@@ -535,6 +620,11 @@ export class TichuEngine {
     } else {
       this.state.currentTurn = player.seat;
     }
+
+    setTimeout(() => {
+      const nextPlayer = this.state.players.find(p => p.seat === this.state.currentTurn);
+      if (nextPlayer) this.startTurnTimer(nextPlayer.id);
+    }, 3000);
 
     if (this.checkRoundEnd()) return true;
 

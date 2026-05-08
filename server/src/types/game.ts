@@ -9,7 +9,8 @@ export interface Card {
 export type GamePhase = 'WAITING' | 'GRAND_TICHU' | 'PASSING' | 'PLAYING' | 'FINISHED';
 
 export interface Player {
-  id: string;
+  id: string; // This is the current socket ID
+  userId: string; // Persistent user ID for reconnections
   nickname: string;
   hand: Card[];
   collectedCards: Card[];
@@ -18,10 +19,12 @@ export interface Player {
   team: 'A' | 'B';
   seat: number; // 0, 1, 2, 3 (clockwise)
   hasPlayedFirstCard: boolean;
+  isDisconnected: boolean;
 }
 
 export interface GameState {
   roomId: string;
+  roomName: string;
   players: Player[];
   phase: GamePhase;
   currentTurn: number;

@@ -34,24 +34,52 @@ const start = async () => {
     io.on('connection', (socket) => {
       console.log('a user connected:', socket.id);
 
-      socket.on('createRoom', ({ nickname, settings }) => {
-        const roomId = roomManager.createRoom(settings);
+      const setupEngineEvents = (roomId: string, engine: ReturnType<RoomManager['getRoom']>) => {
+        if (!engine || engine.onTimerExpire) return;
+        engine.onTimerExpire = () => {
+          if (engine.state.phase === 'PLAYING') {
+            const currentPlayer = engine.state.players.find(p => p.seat === engine.state.currentTurn);
+            if (currentPlayer) {
+              console.log(`Auto-passing for player ${currentPlayer.nickname} (${currentPlayer.id}) in room ${roomId}`);
+              engine.passTrick(currentPlayer.id);
+              io.to(roomId).emit('gameStateUpdate', engine.state);
+            }
+          }
+        };
+        engine.onGameEnd = () => {
+          console.log(`Game ended due to forfeit in room ${roomId}`);
+          io.to(roomId).emit('gameStateUpdate', engine.state);
+          
+          // Clear all turn timers and disconnect timers
+          engine.clearTurnTimer();
+          for (const timer of Object.values(engine.disconnectTimers)) {
+            clearTimeout(timer);
+          }
+        };
+      };
+
+      socket.on('createRoom', ({ nickname, settings, userId }) => {
+        const roomName = `${nickname}의 방`;
+        const roomId = roomManager.createRoom(roomName, settings);
         const engine = roomManager.getRoom(roomId)!;
-        engine.addPlayer(socket.id, nickname);
+        setupEngineEvents(roomId, engine);
+        engine.addPlayer(socket.id, nickname, userId);
         
         socket.join(roomId);
         socket.emit('roomCreated', { roomId, gameState: engine.state });
         console.log(`Room ${roomId} created by ${nickname}`);
       });
 
-      socket.on('joinRoom', ({ roomId, nickname }) => {
+      socket.on('joinRoom', ({ roomId, nickname, userId }) => {
         const engine = roomManager.getRoom(roomId);
         if (!engine) {
           socket.emit('error', '방을 찾을 수 없습니다.');
           return;
         }
 
-        if (engine.addPlayer(socket.id, nickname)) {
+        setupEngineEvents(roomId, engine);
+
+        if (engine.addPlayer(socket.id, nickname, userId)) {
           socket.join(roomId);
           console.log(`${nickname} joined room ${roomId}`);
           
@@ -70,13 +98,28 @@ const start = async () => {
         }
       });
 
-      socket.on('startSoloTest', ({ nickname, settings }) => {
+      socket.on('getRooms', () => {
+        const rooms = roomManager.getAllRooms().map(([id, engine]) => ({
+          roomId: id,
+          roomName: engine.state.roomName,
+          playerCount: engine.state.players.length,
+          activePlayerCount: engine.state.players.filter(p => !p.isDisconnected).length,
+          disconnectedUserIds: engine.state.players.filter(p => p.isDisconnected).map(p => p.userId),
+          phase: engine.state.phase,
+          targetScore: engine.state.settings?.targetScore,
+        }));
+        socket.emit('roomListUpdate', rooms);
+      });
+
+      socket.on('startSoloTest', ({ nickname, settings, userId }) => {
         // Create a room
-        const roomId = roomManager.createRoom(settings);
+        const roomName = `${nickname}의 봇방`;
+        const roomId = roomManager.createRoom(roomName, settings);
         const engine = roomManager.getRoom(roomId)!;
+        setupEngineEvents(roomId, engine);
         
         // Add real player
-        engine.addPlayer(socket.id, nickname);
+        engine.addPlayer(socket.id, nickname, userId);
         socket.join(roomId);
         
         // Add 3 fake bot players
@@ -205,29 +248,153 @@ const start = async () => {
             }
           };
 
-          // 1. Wish Compliance
+          // 1. Wish Compliance - must play a valid combo containing the wish card
           if (wish !== null) {
             const wishCards = hand.filter(c => c.value === wish);
+            const phoenix = hand.find(c => c.value === 16);
+            // Build value->cards map for combo construction
+            const valueCounts: Record<number, any[]> = {};
+            for (const c of hand) {
+              if (c.value >= 2 && c.value <= 14) {
+                if (!valueCounts[c.value]) valueCounts[c.value] = [];
+                valueCounts[c.value].push(c);
+              }
+            }
+
             if (wishCards.length > 0) {
               if (!lastTrick) {
-                // Lead with the wish card
+                // Free lead
                 tryPlay([wishCards[0].id]);
+
               } else if (lastTrick.type === 'Single' && wish > lastTrick.value) {
                 tryPlay([wishCards[0].id]);
-              } else if (lastTrick.type === 'Pair' && wishCards.length >= 2 && wish > lastTrick.value) {
-                tryPlay([wishCards[0].id, wishCards[1].id]);
-              } else if (lastTrick.type === 'Triple' && wishCards.length >= 3 && wish > lastTrick.value) {
-                tryPlay([wishCards[0].id, wishCards[1].id, wishCards[2].id]);
-              } else if (wishCards.length === 4) {
-                // Play bomb if possible to satisfy wish
-                tryPlay([wishCards[0].id, wishCards[1].id, wishCards[2].id, wishCards[3].id]);
+
+              } else if (lastTrick.type === 'Pair' && wish > lastTrick.value) {
+                if (wishCards.length >= 2) {
+                  tryPlay([wishCards[0].id, wishCards[1].id]);
+                } else if (phoenix) {
+                  tryPlay([wishCards[0].id, phoenix.id]);
+                }
+
+              } else if (lastTrick.type === 'Triple' && wish > lastTrick.value) {
+                if (wishCards.length >= 3) {
+                  tryPlay([wishCards[0].id, wishCards[1].id, wishCards[2].id]);
+                } else if (wishCards.length >= 2 && phoenix) {
+                  tryPlay([wishCards[0].id, wishCards[1].id, phoenix.id]);
+                }
+
+              } else if (lastTrick.type === 'FullHouse') {
+                // Try wish as triple part
+                if (wishCards.length >= 3 && wish > lastTrick.value) {
+                  for (const [v, cards] of Object.entries(valueCounts)) {
+                    if (played) break;
+                    if (Number(v) === wish) continue;
+                    if (cards.length >= 2) {
+                      tryPlay([wishCards[0].id, wishCards[1].id, wishCards[2].id, cards[0].id, cards[1].id]);
+                    } else if (cards.length === 1 && phoenix) {
+                      tryPlay([wishCards[0].id, wishCards[1].id, wishCards[2].id, cards[0].id, phoenix.id]);
+                    }
+                  }
+                }
+                // Try wish as triple with phoenix help (2 wish + phoenix = triple)
+                if (!played && wishCards.length >= 2 && phoenix && wish > lastTrick.value) {
+                  for (const [v, cards] of Object.entries(valueCounts)) {
+                    if (played) break;
+                    if (Number(v) === wish) continue;
+                    if (cards.length >= 2) {
+                      tryPlay([wishCards[0].id, wishCards[1].id, phoenix.id, cards[0].id, cards[1].id]);
+                    }
+                  }
+                }
+                // Try wish as pair part, with a different triple
+                if (!played && wishCards.length >= 2) {
+                  for (const [v, cards] of Object.entries(valueCounts)) {
+                    if (played) break;
+                    if (Number(v) === wish) continue;
+                    if (cards.length >= 3 && Number(v) > lastTrick.value) {
+                      tryPlay([cards[0].id, cards[1].id, cards[2].id, wishCards[0].id, wishCards[1].id]);
+                    }
+                  }
+                }
+                // Try wish as pair with phoenix, with a different triple
+                if (!played && wishCards.length >= 1 && phoenix) {
+                  for (const [v, cards] of Object.entries(valueCounts)) {
+                    if (played) break;
+                    if (Number(v) === wish) continue;
+                    if (cards.length >= 3 && Number(v) > lastTrick.value) {
+                      tryPlay([cards[0].id, cards[1].id, cards[2].id, wishCards[0].id, phoenix.id]);
+                    }
+                  }
+                }
+
+              } else if (lastTrick.type === 'Straight') {
+                const requiredLength = lastTrick.cards.length;
+                const availableValues = new Map<number, any>();
+                for (const c of hand) {
+                  if (c.value >= 2 && c.value <= 14) {
+                    if (!availableValues.has(c.value)) availableValues.set(c.value, c);
+                  }
+                }
+
+                for (let start = 2; start <= 14 - requiredLength + 1 && !played; start++) {
+                  const end = start + requiredLength - 1;
+                  if (end <= lastTrick.value) continue;
+                  if (wish < start || wish > end) continue;
+
+                  const cards: any[] = [];
+                  let missingCount = 0;
+                  let valid = true;
+                  for (let v = start; v <= end; v++) {
+                    if (availableValues.has(v)) {
+                      cards.push(availableValues.get(v));
+                    } else {
+                      missingCount++;
+                      if (missingCount === 1 && phoenix) {
+                        cards.push(phoenix);
+                      } else {
+                        valid = false;
+                        break;
+                      }
+                    }
+                  }
+
+                  if (valid && cards.length === requiredLength) {
+                    tryPlay(cards.map((c: any) => c.id));
+                  }
+                }
+
+              } else if (lastTrick.type === 'ConsecutivePairs') {
+                const requiredPairs = lastTrick.cards.length / 2;
+                for (let start = 2; start <= 14 - requiredPairs + 1 && !played; start++) {
+                  const end = start + requiredPairs - 1;
+                  if (end <= lastTrick.value) continue;
+                  if (wish < start || wish > end) continue;
+
+                  const cards: any[] = [];
+                  let phoenixUsed = false;
+                  let valid = true;
+                  for (let v = start; v <= end; v++) {
+                    const available = valueCounts[v] || [];
+                    if (available.length >= 2) {
+                      cards.push(available[0], available[1]);
+                    } else if (available.length === 1 && !phoenixUsed && phoenix) {
+                      cards.push(available[0], phoenix);
+                      phoenixUsed = true;
+                    } else {
+                      valid = false;
+                      break;
+                    }
+                  }
+
+                  if (valid && cards.length === requiredPairs * 2) {
+                    tryPlay(cards.map((c: any) => c.id));
+                  }
+                }
               }
 
-              // Fallback: If they STILL haven't played but HAVE the wish card, 
-              // the engine will BLOCK their pass. So they MUST play it as a single (or whatever)
-              // even if it's strictly an illegal pattern, they have no other choice to break the loop for simple AI.
-              if (!played) {
-                 tryPlay([wishCards[0].id]);
+              // Bomb with wish cards (always possible regardless of lastTrick type)
+              if (!played && wishCards.length === 4) {
+                tryPlay([wishCards[0].id, wishCards[1].id, wishCards[2].id, wishCards[3].id]);
               }
             }
           }
@@ -241,15 +408,14 @@ const start = async () => {
               if (dog) {
                 tryPlay([dog.id]);
               } else if (sparrow) {
-                // Play sparrow and make a random wish between 2 and 14
                 const randomWish = Math.floor(Math.random() * 13) + 2; 
                 tryPlay([sparrow.id], randomWish);
               } else {
-                const lowest = hand.find(c => c.value > 1) || hand[0]; // avoid playing bomb pieces if possible, just naive
+                const lowest = hand.find(c => c.value > 1) || hand[0];
                 if (lowest) tryPlay([lowest.id]);
               }
             } else {
-              // Try to beat the trick, but don't step on partner's high cards
+              // Try to beat the trick
               const partner = engine.state.players.find(p => p.team === currentPlayer.team && p.id !== currentPlayer.id);
               const isPartnerWinningWithHighCard = partner && lastTrick.playerId === partner.id && lastTrick.value >= 10;
               

@@ -177,21 +177,7 @@
   font-size: 1.1rem;
 }
 
-button {
-  margin-top: 10px;
-  background-color: #f39c12;
-}
-
-button:hover:not(:disabled) {
-  background-color: #e67e22;
-}
-
-button:disabled {
-  background-color: #5a6a7a;
-  color: #d1d8e0;
-  cursor: not-allowed;
-  opacity: 0.8;
-}
+/* Removed generic button styles as requested */
 
 .grand-badge {
   background: #f1c40f;
@@ -290,6 +276,11 @@ button:disabled {
     width: 100% !important;
     height: auto !important;
   }
+
+  .current-trick .card {
+    width: 60px !important;
+    height: 88px !important;
+  }
   
   .overlay-card-wrapper .card-icon {
     font-size: 1.5rem;
@@ -360,10 +351,7 @@ button:disabled {
     font-size: 0.85rem !important;
   }
 
-  .game-overlay button {
-    font-size: 0.9rem !important;
-    padding: 8px 14px !important;
-  }
+  /* Removed generic button styles for .game-overlay as requested */
 
   .waiting-ui {
     min-width: unset !important;

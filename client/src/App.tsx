@@ -5,7 +5,7 @@ import { useGameStore } from './store/useGameStore'
 import './App.css'
 
 function App() {
-  const { socket, gameState, connect, createRoom, joinRoom, startSoloTest, error, setNeedsNickname } = useGameStore()
+  const { socket, gameState, connect, createRoom, joinRoom, startSoloTest, error, roomList, getRooms, setNeedsNickname } = useGameStore()
 
   useEffect(() => {
     connect()
@@ -13,6 +13,7 @@ function App() {
 
   useEffect(() => {
     if (socket && !gameState) {
+      getRooms(); // Fetch rooms on initial load
       const urlParams = new URLSearchParams(window.location.search);
       const inviteRoomId = urlParams.get('roomId');
       if (inviteRoomId) {
@@ -28,6 +29,8 @@ function App() {
     return (
       <div className="app-root">
         <Lobby 
+          roomList={roomList}
+          getRooms={getRooms}
           onCreate={(nickname, settings) => {
             localStorage.setItem('tichu_nickname', nickname);
             createRoom(nickname, settings);

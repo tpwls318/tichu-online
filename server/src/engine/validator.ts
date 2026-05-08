@@ -176,7 +176,9 @@ export class HandValidator {
 
     // If last trick is a pair, can they make a pair with the wish card that beats it?
     if (lastTrick.type === 'Pair') {
-      return wishCards.length >= 2 && currentWish > lastTrick.value;
+      const hasPhoenix = hand.some(c => c.value === 16);
+      const pairPossible = wishCards.length >= 2 || (wishCards.length >= 1 && hasPhoenix);
+      return pairPossible && currentWish > lastTrick.value;
     }
 
     // If last trick is a triple
@@ -184,19 +186,106 @@ export class HandValidator {
       return wishCards.length >= 3 && currentWish > lastTrick.value;
     }
 
-    // For FullHouse, Straight, ConsecutivePairs:
-    // This requires complex subset finding which is hard.
-    // A simplified check: if they have the card but we can't easily prove they can make a valid combo,
-    // we assume they might be able to. In a perfect engine we'd generate all legal plays.
-    // For now, if the trick is complex, we just check if they can play a Bomb containing it.
-    
-    // Check if they can make a Bomb with it
-    if (wishCards.length === 4) return true; // Can always play a bomb quartet (unless previous is higher bomb)
-    // If we wanted to be perfectly strict, we'd calculate all possible straight flushes here too.
+    // For Straight and other complex types: brute-force check all subsets
+    // Generate all possible plays of the required type/length containing the wished card
+    if (lastTrick.type === 'Straight') {
+      const requiredLength = lastTrick.length;
+      const requiredMinValue = lastTrick.value; // highest card value of previous straight
+      const hasPhoenix = hand.some(c => c.value === 16);
+      
+      // Get all unique non-special card values in hand (2-14), plus mark phoenix
+      const availableValues = new Set<number>();
+      for (const c of hand) {
+        if (c.value >= 2 && c.value <= 14) availableValues.add(c.value);
+      }
 
-    // If we reach here, it's a complex trick type and we don't have a simple subset match.
-    // For MVP, we will only STRICTLY enforce singles, pairs, triples, and bombs.
-    // If it's a straight, we return false here meaning the game won't *force* them to play it.
+      // Try all possible starting values for a straight of requiredLength
+      for (let start = 2; start <= 14 - requiredLength + 1; start++) {
+        const end = start + requiredLength - 1;
+        // The straight must beat the previous one (highest card > previous highest)
+        if (end <= requiredMinValue) continue;
+        // The straight must contain the wished card
+        if (currentWish < start || currentWish > end) continue;
+
+        let missingCount = 0;
+        for (let v = start; v <= end; v++) {
+          if (!availableValues.has(v)) missingCount++;
+        }
+
+        // Phoenix can fill exactly 1 missing gap
+        if (missingCount === 0 || (missingCount === 1 && hasPhoenix)) {
+          return true;
+        }
+      }
+    }
+
+    // For FullHouse: check if they can make one containing the wished card
+    if (lastTrick.type === 'FullHouse') {
+      const hasPhoenix = hand.some(c => c.value === 16);
+      const valueCounts: Record<number, number> = {};
+      for (const c of hand) {
+        if (c.value >= 2 && c.value <= 14) {
+          valueCounts[c.value] = (valueCounts[c.value] || 0) + 1;
+        }
+      }
+
+      // Try wished card as the triple part
+      if (wishCards.length >= 3 && currentWish > lastTrick.value) {
+        // Need any pair
+        for (const [v, count] of Object.entries(valueCounts)) {
+          if (Number(v) !== currentWish && count >= 2) return true;
+          if (Number(v) !== currentWish && count >= 1 && hasPhoenix) return true;
+        }
+      }
+      // Try wished card as part of the pair, with a higher triple
+      if (wishCards.length >= 2) {
+        for (const [v, count] of Object.entries(valueCounts)) {
+          if (Number(v) !== currentWish && count >= 3 && Number(v) > lastTrick.value) return true;
+        }
+      }
+      // Phoenix can help form a triple with wished card
+      if (wishCards.length >= 2 && hasPhoenix && currentWish > lastTrick.value) {
+        for (const [v, count] of Object.entries(valueCounts)) {
+          if (Number(v) !== currentWish && count >= 2) return true;
+        }
+      }
+    }
+
+    // For ConsecutivePairs
+    if (lastTrick.type === 'ConsecutivePairs') {
+      const requiredPairs = lastTrick.length / 2;
+      const hasPhoenix = hand.some(c => c.value === 16);
+      const valueCounts: Record<number, number> = {};
+      for (const c of hand) {
+        if (c.value >= 2 && c.value <= 14) {
+          valueCounts[c.value] = (valueCounts[c.value] || 0) + 1;
+        }
+      }
+
+      for (let start = 2; start <= 14 - requiredPairs + 1; start++) {
+        const end = start + requiredPairs - 1;
+        if (end <= lastTrick.value) continue;
+        if (currentWish < start || currentWish > end) continue;
+
+        let phoenixUsed = false;
+        let valid = true;
+        for (let v = start; v <= end; v++) {
+          const count = valueCounts[v] || 0;
+          if (count >= 2) continue;
+          if (count === 1 && !phoenixUsed && hasPhoenix) {
+            phoenixUsed = true;
+            continue;
+          }
+          valid = false;
+          break;
+        }
+        if (valid) return true;
+      }
+    }
+
+    // Check if they can make a Bomb with it
+    if (wishCards.length === 4) return true;
+
     return false;
   }
 }

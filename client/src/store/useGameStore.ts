@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
+import { getUserId } from '../utils/userId';
 
 // GameState interface removed or integrated if not used
 
@@ -9,8 +10,10 @@ interface GameStore {
   roomId: string | null;
   error: string | null;
   needsNickname: boolean;
+  roomList: any[];
   setNeedsNickname: (val: boolean) => void;
   connect: () => void;
+  getRooms: () => void;
   createRoom: (nickname: string, settings?: { targetScore: number, timeLimit: number }) => void;
   joinRoom: (nickname: string, roomId: string) => void;
   updateNickname: (newNickname: string) => void;
@@ -33,8 +36,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   roomId: null,
   error: null,
   needsNickname: false,
+  roomList: [],
 
   setNeedsNickname: (val: boolean) => set({ needsNickname: val }),
+
+  getRooms: () => {
+    get().socket?.emit('getRooms');
+  },
 
   connect: () => {
     if (get().socket) return;
@@ -47,7 +55,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
 
     socket.on('gameStateUpdate', (gameState) => {
-      set({ gameState, error: null });
+      set({ gameState });
+      
+      // Update local storage settings if phase is WAITING (game settings might have changed)
+      if (gameState.phase === 'WAITING' && gameState.settings) {
+        localStorage.setItem('tichu_target_score', gameState.settings.targetScore.toString());
+        localStorage.setItem('tichu_time_limit', gameState.settings.timeLimit.toString());
+      }
+    });
+
+    socket.on('roomListUpdate', (rooms) => {
+      set({ roomList: rooms });
     });
 
     socket.on('error', (msg) => {
@@ -58,11 +76,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   createRoom: (nickname, settings) => {
-    get().socket?.emit('createRoom', { nickname, settings });
+    get().socket?.emit('createRoom', { nickname, settings, userId: getUserId() });
   },
 
   joinRoom: (nickname, roomId) => {
-    get().socket?.emit('joinRoom', { nickname, roomId });
+    get().socket?.emit('joinRoom', { nickname, roomId, userId: getUserId() });
   },
 
   updateNickname: (newNickname) => {
@@ -73,7 +91,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   startSoloTest: (nickname, settings) => {
-    get().socket?.emit('startSoloTest', { nickname, settings });
+    get().socket?.emit('startSoloTest', { nickname, settings, userId: getUserId() });
   },
 
   answerGrandTichu: (callGrand) => {
