@@ -26,6 +26,7 @@ body {
   margin: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* dynamic viewport height - accounts for mobile address bar */
   overflow: hidden;
   background-color: #1a252f;
 }

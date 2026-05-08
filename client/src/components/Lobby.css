@@ -4,6 +4,7 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
+  height: 100dvh;
   background: linear-gradient(135deg, #152232 0%, #1e3450 50%, #152232 100%);
   color: white;
   font-family: 'Inter', system-ui, sans-serif;

@@ -300,7 +300,7 @@ export const GameBoard: React.FC = () => {
   };
 
   return (
-    <div className="game-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#141E26' }}>
+    <div className="game-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', width: '100vw', backgroundColor: '#141E26' }}>
       {/* 🚀 상단 공통 Top Bar (스코어 및 부가 기능) */}
       <div className="game-top-bar" style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
