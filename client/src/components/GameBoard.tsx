@@ -745,7 +745,24 @@ export const GameBoard: React.FC = () => {
                         {gameState.players.find((p: any) => p.id === delayedLastTrick?.playerId)?.nickname}의 {delayedLastTrick.type}
                       </div>
                       <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', width: '100%', flexWrap: 'wrap' }}>
-                        {delayedLastTrick.cards.map((card: any) => (
+                        {(() => {
+                          const cards = [...delayedLastTrick.cards];
+                          if (delayedLastTrick.type === 'FullHouse') {
+                            // 트리플인 숫자를 찾아서 앞으로 보냄
+                            const counts: Record<number, number> = {};
+                            cards.forEach(c => counts[c.value] = (counts[c.value] || 0) + 1);
+                            const tripleValue = Object.keys(counts).find(v => counts[Number(v)] === 3);
+                            if (tripleValue) {
+                              return cards.sort((a, b) => {
+                                if (a.value === Number(tripleValue) && b.value !== Number(tripleValue)) return -1;
+                                if (a.value !== Number(tripleValue) && b.value === Number(tripleValue)) return 1;
+                                return 0;
+                              });
+                            }
+                          }
+                          // 그 외 조합은 오름차순 정렬
+                          return cards.sort((a, b) => a.value - b.value);
+                        })().map((card: any) => (
                           <CardComponent suit={card.suit} value={card.value} id={card.id} isSelected={false} disableHover={true} onClick={() => {}} />
                         ))}
                       </div>
