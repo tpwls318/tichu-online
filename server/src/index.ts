@@ -57,6 +57,13 @@ const start = async () => {
           for (const timer of Object.values(engine.disconnectTimers)) {
             clearTimeout(timer);
           }
+          
+          // If it's a bot room, destroy it completely on forfeit so returning players don't join a dead game
+          const isBotRoom = engine.state.players.some(p => p.id.startsWith('bot'));
+          if (isBotRoom) {
+            roomManager.removeRoom(roomId);
+            console.log(`Bot room ${roomId} completely destroyed after forfeit timeout.`);
+          }
         };
       };
 

@@ -77,6 +77,13 @@ export const Lobby: React.FC<LobbyProps> = ({ roomList = [], getRooms, onJoin, o
   const [showSettings, setShowSettings] = useState(false);
   const [pendingAction, setPendingAction] = useState<'CREATE' | 'SOLO' | null>(null);
 
+  // 로비 화면에 들어오면 항상 방 목록을 최신 상태로 새로고침
+  React.useEffect(() => {
+    if (getRooms) {
+      getRooms();
+    }
+  }, [getRooms]);
+
   const handleOpenSettings = useCallback((action: 'CREATE' | 'SOLO') => {
     setPendingAction(action);
     setShowSettings(true);

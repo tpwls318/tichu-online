@@ -36,14 +36,14 @@ export class TichuEngine {
   }
   
   addPlayer(id: string, nickname: string, userId: string = '') {
-    // Reconnection logic: check if there's a disconnected player with the same userId
+    // Reconnection or duplicate rejoin logic: check if there's a player with the same userId
     if (userId) {
-      const disconnectedPlayer = this.state.players.find(p => p.userId === userId && p.isDisconnected);
-      if (disconnectedPlayer) {
-        const oldId = disconnectedPlayer.id; // Save old socket ID for timer cleanup
-        disconnectedPlayer.id = id; // Update socket ID
-        disconnectedPlayer.nickname = nickname;
-        disconnectedPlayer.isDisconnected = false;
+      const existingUser = this.state.players.find(p => p.userId === userId);
+      if (existingUser) {
+        const oldId = existingUser.id; // Save old socket ID for timer cleanup
+        existingUser.id = id; // Update socket ID
+        existingUser.nickname = nickname;
+        existingUser.isDisconnected = false;
         
         // Clear forfeit timer (stored under old socket ID)
         if (this.disconnectTimers[oldId]) {

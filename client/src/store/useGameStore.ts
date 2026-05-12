@@ -55,7 +55,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
 
     socket.on('gameStateUpdate', (gameState) => {
-      set({ gameState });
+      set({ gameState, error: null });
       
       // Update local storage settings if phase is WAITING (game settings might have changed)
       if (gameState.phase === 'WAITING' && gameState.settings) {
@@ -199,5 +199,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       get().socket?.emit('leaveRoom', { roomId });
     }
     set({ gameState: null, roomId: null });
+    get().socket?.emit('getRooms');
   }
 }));
