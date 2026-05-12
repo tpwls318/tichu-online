@@ -67,10 +67,8 @@ export const GameBoard: React.FC = () => {
     }
   }, [gameState?.phase]);
 
-  if (!gameState || !socket) return null;
-
-  const me = gameState.players.find((p: any) => p.id === socket.id);
-  if (!me) return (
+  const me = gameState?.players?.find((p: any) => p.id === socket?.id);
+  if (!gameState || !socket || !me) return (
     <div style={{ 
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       height: '100dvh', width: '100vw', backgroundColor: '#141E26', color: 'white', gap: '16px'

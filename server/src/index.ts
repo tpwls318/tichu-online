@@ -85,6 +85,8 @@ const start = async () => {
           socket.join(roomId);
           console.log(`${nickname} joined room ${roomId}`);
           
+          // Direct emit to ensure the reconnecting client definitely gets the update immediately
+          socket.emit('gameStateUpdate', engine.state);
           io.to(roomId).emit('gameStateUpdate', engine.state);
           
           // After reconnection, if it's a bot's turn, trigger bot play

@@ -89,6 +89,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     });
 
+    // Listen for mobile browser tab switching back to visibility
+    if (typeof window !== 'undefined') {
+      window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          const currentSocket = get().socket;
+          if (currentSocket) {
+            currentSocket.connect(); // Force wake up socket if it was sleeping
+            const { roomId, gameState } = get();
+            if (roomId && gameState) {
+              const nickname = localStorage.getItem('tichu_nickname') || 'Player';
+              currentSocket.emit('joinRoom', { nickname, roomId: gameState.roomId, userId: getUserId() });
+            } else {
+              currentSocket.emit('getRooms');
+            }
+          }
+        }
+      });
+    }
+
     set({ socket });
   },
 
