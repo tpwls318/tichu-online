@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CardComponent } from './Card';
 import { HandValidator } from '../utils/validator';
 import { useGameStore } from '../store/useGameStore';
+import { getUserId } from '../utils/userId';
 import './GameBoard.css';
 
 export const GameBoard: React.FC = () => {
@@ -29,6 +30,32 @@ export const GameBoard: React.FC = () => {
   const timeLimit = gameState?.settings?.timeLimit || 30;
   const [timeLeft, setTimeLeft] = useState(timeLimit);
 
+  const me = gameState?.players?.find((p: any) => p.id === socket?.id || (p.userId && p.userId === getUserId()));
+
+  const suitOrder: Record<string, number> = { 'Jade': 1, 'Sword': 2, 'Pagoda': 3, 'Star': 4, 'Special': 5 };
+  
+  const sortedHand = me?.hand ? [...me.hand].sort((a, b) => {
+    if (a.value !== b.value) return a.value - b.value;
+    return suitOrder[a.suit] - suitOrder[b.suit];
+  }) : [];
+
+  const otherPlayers = gameState?.players ? gameState.players.filter((p: any) => p.id !== socket?.id) : [];
+  
+  const sortedOthers = me ? [...otherPlayers].sort((a, b) => {
+    const seatA = (a.seat - me.seat + 4) % 4;
+    const seatB = (b.seat - me.seat + 4) % 4;
+    return seatA - seatB;
+  }) : [];
+
+  const getTargetName = (id: string) => {
+    if (sortedOthers.length > 0 && id === sortedOthers[0]?.id) return '왼쪽';
+    if (sortedOthers.length > 1 && id === sortedOthers[1]?.id) return '마주보는 자리';
+    if (sortedOthers.length > 2 && id === sortedOthers[2]?.id) return '오른쪽';
+    return '';
+  };
+
+  // --- [모든 useEffect 훅들을 조기 종료 조건문 위쪽으로 몰아서 선언] ---
+
   useEffect(() => {
     if (gameState?.phase === 'PLAYING') {
       setTimeLeft(timeLimit);
@@ -43,12 +70,10 @@ export const GameBoard: React.FC = () => {
     return () => clearInterval(timerId);
   }, [gameState?.phase, gameState?.currentTurn]);
 
-  // 트릭이 비워질 때 잠시 동안 바닥에 남겨서 보여주기 위한 효과
   useEffect(() => {
     if (gameState?.lastTrick) {
       setDelayedLastTrick(gameState.lastTrick);
     } else if (!gameState?.lastTrick && delayedLastTrick) {
-      // 내가 낸 카드로 인해 트릭이 종료된 경우(내 턴에서 모두 패스) 딜레이 생략
       if (delayedLastTrick.playerId === socket?.id) {
         setDelayedLastTrick(null);
       } else {
@@ -67,21 +92,8 @@ export const GameBoard: React.FC = () => {
     }
   }, [gameState?.phase]);
 
-  const me = gameState?.players?.find((p: any) => p.id === socket?.id);
-  if (!gameState || !socket || !me) return (
-    <div style={{ 
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      height: '100dvh', width: '100vw', backgroundColor: '#141E26', color: 'white', gap: '16px'
-    }}>
-      <div style={{ fontSize: '1.5rem', animation: 'pulse 1.5s ease-in-out infinite' }}>🔄</div>
-      <div style={{ fontSize: '1.1rem' }}>재연결 중...</div>
-      <style>{`@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
-    </div>
-  );
-
-  // Initialize showReceived when data arrives (only once per PLAYING phase)
   useEffect(() => {
-    if (gameState?.phase === 'PLAYING' && gameState.receivedPasses && gameState.receivedPasses[me?.id] && !hasShownReceived.current) {
+    if (gameState?.phase === 'PLAYING' && gameState.receivedPasses && me?.id && gameState.receivedPasses[me.id] && !hasShownReceived.current) {
       setShowReceived(true);
       hasShownReceived.current = true;
     } else if (gameState?.phase !== 'PLAYING') {
@@ -90,21 +102,12 @@ export const GameBoard: React.FC = () => {
     }
   }, [gameState?.phase, gameState?.receivedPasses, me?.id]);
 
-  const suitOrder: Record<string, number> = { 'Jade': 1, 'Sword': 2, 'Pagoda': 3, 'Star': 4, 'Special': 5 };
-  
-  const sortedHand = [...me.hand].sort((a, b) => {
-    if (a.value !== b.value) return a.value - b.value;
-    return suitOrder[a.suit] - suitOrder[b.suit];
-  });
-
-  // 타임아웃 시 자동 플레이 로직
   useEffect(() => {
-    if (timeLeft === 0 && gameState?.phase === 'PLAYING' && gameState?.currentTurn === me?.seat) {
-      if (gameState.cardEvent) return; // 애니메이션 진행 중 대기
+    if (timeLeft === 0 && gameState?.phase === 'PLAYING' && me && gameState.currentTurn === me.seat) {
+      if (gameState.cardEvent) return;
 
-      const isFirstTrick = gameState.currentTrickCards?.length === 0;
+      const isFirstTrick = (!gameState.currentTrickCards || gameState.currentTrickCards.length === 0);
 
-      // 1. 짹짹이 콜이 존재하고, 낼 수 있다면 해당 패를 자동으로 냄
       if (gameState.currentWish !== null) {
         if (HandValidator.canSatisfyWish(me.hand, gameState.currentWish, gameState.lastTrick)) {
           const wishCards = me.hand.filter((c: any) => c.value === gameState.currentWish).map((c: any) => c.id);
@@ -125,60 +128,61 @@ export const GameBoard: React.FC = () => {
         }
       }
 
-      // 2. 첫 트릭이라 패스가 불가능할 경우 가장 낮은 카드 1장 자동 제출
       if (isFirstTrick) {
         if (sortedHand.length > 0) {
           playCards([sortedHand[0].id]);
         }
       } else {
-        // 3. 그 외의 경우 자동 패스
         passTrick();
         setSelectedPlayCards([]);
       }
     }
-  }, [timeLeft, gameState?.phase, gameState?.currentTurn, gameState?.currentTrickCards, gameState?.currentWish, gameState?.lastTrick, me?.seat, me?.hand, sortedHand, playCards, passTrick, gameState?.cardEvent]);
+  }, [timeLeft, gameState?.phase, gameState?.currentTurn, gameState?.currentTrickCards, gameState?.currentWish, gameState?.lastTrick, me, sortedHand, playCards, passTrick, gameState?.cardEvent]);
 
-
-  const otherPlayers = gameState.players.filter((p: any) => p.id !== socket.id);
-  
-  // Sort other players by seat relative to me
-  const sortedOthers = [...otherPlayers].sort((a, b) => {
-    const seatA = (a.seat - me.seat + 4) % 4;
-    const seatB = (b.seat - me.seat + 4) % 4;
-    return seatA - seatB;
-  });
-
-  // Debug: Show bot hands in console
   useEffect(() => {
-    if (gameState && otherPlayers.every((p: any) => p.hand.length === 14)) {
-      console.log("=== BOTS/OPPONENTS HANDS ===");
-      sortedOthers.forEach((p: any) => {
-        const sortedBotHand = [...p.hand].sort((a: any, b: any) => {
-          if (a.value !== b.value) return a.value - b.value;
-          return suitOrder[a.suit] - suitOrder[b.suit];
+    if (gameState?.players && socket?.id) {
+      const others = gameState.players.filter((p: any) => p.id !== socket.id);
+      if (others.length > 0 && others.every((p: any) => p.hand && p.hand.length === 14)) {
+        console.log("=== BOTS/OPPONENTS HANDS ===");
+        sortedOthers.forEach((p: any) => {
+          if (!p.hand) return;
+          const sortedBotHand = [...p.hand].sort((a: any, b: any) => {
+            if (a.value !== b.value) return a.value - b.value;
+            return suitOrder[a.suit] - suitOrder[b.suit];
+          });
+          const handStr = sortedBotHand.map((c: any) => c.value === 11 ? 'J' : c.value === 12 ? 'Q' : c.value === 13 ? 'K' : c.value === 14 ? 'A' : c.value.toString()).join(', ');
+          console.log(`${getTargetName(p.id)} [${p.team}팀]: ${handStr}`);
         });
-        const handStr = sortedBotHand.map((c: any) => c.value === 11 ? 'J' : c.value === 12 ? 'Q' : c.value === 13 ? 'K' : c.value === 14 ? 'A' : c.value.toString()).join(', ');
-        console.log(`${getTargetName(p.id)} [${p.team}팀]: ${handStr}`);
-      });
-      console.log("============================");
+        console.log("============================");
+      }
     }
-  }, [gameState?.players, gameState?.phase]);
+  }, [gameState?.players, gameState?.phase, socket?.id]);
 
   useEffect(() => {
     if (gameState?.cardEvent) {
       setActiveEvent(gameState.cardEvent);
-      // We explicitly do NOT clear the timeout here when gameState.cardEvent becomes null.
-      // The server clears the event immediately when the next player moves, but the 
-      // client still needs to finish the 2.5s animation before letting the user play.
       setTimeout(() => {
         setActiveEvent(null);
       }, gameState.cardEvent.duration || 2500);
     }
   }, [gameState?.cardEvent]);
 
+  // --- [모든 훅 선언이 끝난 후, 최종 조건부 조기 종료(return) 배치] ---
+  if (!gameState || !socket || !me) return (
+    <div style={{ 
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      height: '100dvh', width: '100vw', backgroundColor: '#141E26', color: 'white', gap: '16px'
+    }}>
+      <div style={{ fontSize: '1.5rem', animation: 'pulse 1.5s ease-in-out infinite' }}>🔄</div>
+      <div style={{ fontSize: '1.1rem' }}>재연결 중...</div>
+      <style>{`@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
+    </div>
+  );
+
+  // --- [조기 종료를 통과한 이후에 선언되어야 하는 이벤트 핸들러 및 렌더링용 변수들] ---
+
   const handleCardClick = (cardId: string) => {
     if (gameState.phase === 'PASSING') {
-      // 이미 배정된 카드를 다시 클릭하면 배정 해제
       const currentAssignee = Object.keys(passingTargets).find(key => passingTargets[key] === cardId);
       if (currentAssignee) {
         const newTargets = { ...passingTargets };
@@ -187,9 +191,7 @@ export const GameBoard: React.FC = () => {
         setPendingPassCard(null);
         return;
       }
-      // 이미 3장 다 배정됐으면 더 선택 불가
       if (Object.keys(passingTargets).length >= 3) return;
-      // 카드를 선택하면 pendingPassCard로 설정 (줄 사람 대기)
       setPendingPassCard(pendingPassCard === cardId ? null : cardId);
     } else if (gameState.phase === 'PLAYING') {
       if (selectedPlayCards.includes(cardId)) {
@@ -203,13 +205,11 @@ export const GameBoard: React.FC = () => {
   const handlePlaySubmit = () => {
     if (selectedPlayCards.length === 0) return;
     
-    // 짹짹이 콜(Wish) 검증 로직
     if (gameState.currentWish !== null) {
       const selectedCardsData = me.hand.filter((c: any) => selectedPlayCards.includes(c.id));
       const satisfiesWish = selectedCardsData.some((c: any) => c.value === gameState.currentWish);
       
       if (!satisfiesWish) {
-        // 콜을 만족시킬 수 있는지 확인
         const canSatisfy = HandValidator.canSatisfyWish(me.hand, gameState.currentWish, gameState.lastTrick);
         if (canSatisfy) {
           const valueMap: Record<number, string> = {
@@ -219,12 +219,11 @@ export const GameBoard: React.FC = () => {
           const valStr = valueMap[gameState.currentWish] || gameState.currentWish;
           setPlayError(`짹짹이의 콜(${valStr})을 낼 수 있는 패가 있습니다.\n반드시 포함해서 내야 합니다!`);
           setTimeout(() => setPlayError(null), 3500);
-          return; // 제출 차단
+          return;
         }
       }
     }
     
-    // Check if hand contains Sparrow (value 1)
     const hasSparrow = selectedPlayCards.some(id => {
       const card = me.hand.find((c: any) => c.id === id);
       return card && card.value === 1;
@@ -246,7 +245,6 @@ export const GameBoard: React.FC = () => {
   };
 
   const handlePassTrick = () => {
-    // 짹짹이 콜(Wish) 검증 로직 (마찬가지로 낼 수 있으면 패스 불가)
     if (gameState.currentWish !== null) {
       const canSatisfy = HandValidator.canSatisfyWish(me.hand, gameState.currentWish, gameState.lastTrick);
       if (canSatisfy) {
@@ -257,7 +255,7 @@ export const GameBoard: React.FC = () => {
         const valStr = valueMap[gameState.currentWish] || gameState.currentWish;
         setPlayError(`짹짹이의 콜(${valStr})을 낼 수 있으므로\n패스할 수 없습니다!`);
         setTimeout(() => setPlayError(null), 3500);
-        return; // 패스 차단
+        return;
       }
     }
 
@@ -270,13 +268,11 @@ export const GameBoard: React.FC = () => {
     const cards = cardIds.map(id => me.hand.find((c: any) => c.id === id)).filter(Boolean);
     if (cards.length !== cardIds.length) return false;
     
-    // Check Quartet
     if (cards.length === 4) {
       const val = cards[0].value;
       if (cards.every(c => c.value === val)) return true;
     }
 
-    // Check Straight Flush
     if (cards.length >= 5) {
       const sorted = [...cards].sort((a, b) => a.value - b.value);
       const suit = sorted[0].suit;
@@ -297,14 +293,8 @@ export const GameBoard: React.FC = () => {
     passCards(passingTargets);
   };
 
-  const hasAlreadyPassed = Object.keys(gameState.passStates[me.id] || {}).length === 3;
+  const hasAlreadyPassed = me ? Object.keys(gameState.passStates[me.id] || {}).length === 3 : false;
 
-  const getTargetName = (id: string) => {
-    if (id === sortedOthers[0].id) return '왼쪽';
-    if (id === sortedOthers[1].id) return '마주보는 자리';
-    if (id === sortedOthers[2].id) return '오른쪽';
-    return '';
-  };
 
   return (
     <div className="game-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', width: '100vw', backgroundColor: '#141E26' }}>
