@@ -68,8 +68,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ roomList: rooms });
     });
 
+    // When socket reconnects, try to rejoin previous room
+    socket.on('connect', () => {
+      const { roomId, gameState } = get();
+      if (roomId && gameState) {
+        // Try to rejoin previous room with saved nickname
+        const nickname = localStorage.getItem('tichu_nickname') || 'Player';
+        socket.emit('joinRoom', { nickname, roomId: gameState.roomId, userId: getUserId() });
+      } else {
+        socket.emit('getRooms');
+      }
+    });
+
+    // If rejoin fails (room deleted etc.), clear state and go to lobby
     socket.on('error', (msg) => {
-      set({ error: msg });
+      if (msg === '방을 찾을 수 없습니다.' || msg === '방이 가득 찼습니다.') {
+        set({ gameState: null, roomId: null, error: msg });
+        socket.emit('getRooms');
+      } else {
+        set({ error: msg });
+      }
     });
 
     set({ socket });

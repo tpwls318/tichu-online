@@ -189,12 +189,17 @@ export const Lobby: React.FC<LobbyProps> = ({ roomList = [], getRooms, onJoin, o
                     </div>
                   </div>
                   <button 
-                    onClick={() => onJoin(nickname, room.roomId)}
-                    disabled={!nickname || !canJoin}
+                    onClick={() => {
+                      const reconnectNickname = isDisconnectedMe 
+                        ? (localStorage.getItem('tichu_nickname') || nickname || 'Player') 
+                        : nickname;
+                      onJoin(reconnectNickname, room.roomId);
+                    }}
+                    disabled={!isDisconnectedMe && (!nickname || !canJoin)}
                     style={{ 
                       padding: '8px 12px', 
-                      backgroundColor: canJoin ? btnColor : '#7f8c8d',
-                      color: 'white', border: 'none', borderRadius: '5px', cursor: (!nickname || !canJoin) ? 'not-allowed' : 'pointer' 
+                      backgroundColor: (isDisconnectedMe || canJoin) ? btnColor : '#7f8c8d',
+                      color: 'white', border: 'none', borderRadius: '5px', cursor: (!isDisconnectedMe && (!nickname || !canJoin)) ? 'not-allowed' : 'pointer' 
                     }}
                   >
                     {btnText}

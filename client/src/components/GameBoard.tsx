@@ -397,13 +397,13 @@ export const GameBoard: React.FC = () => {
                     <>
                       <button 
                         onClick={playAgain}
-                        style={{ padding: '12px 24px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        style={{ padding: '12px 20px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
                       >
                         다시하기
                       </button>
                       <button 
                         onClick={leaveRoom}
-                        style={{ padding: '12px 24px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        style={{ padding: '12px 20px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
                       >
                         처음화면으로
                       </button>
@@ -412,7 +412,7 @@ export const GameBoard: React.FC = () => {
                     <>
                       <button 
                         onClick={leaveRoom}
-                        style={{ padding: '12px 24px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        style={{ padding: '12px 20px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}
                       >
                         처음화면으로 (나가기)
                       </button>
