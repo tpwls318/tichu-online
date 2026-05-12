@@ -40,14 +40,15 @@ export class TichuEngine {
     if (userId) {
       const disconnectedPlayer = this.state.players.find(p => p.userId === userId && p.isDisconnected);
       if (disconnectedPlayer) {
+        const oldId = disconnectedPlayer.id; // Save old socket ID for timer cleanup
         disconnectedPlayer.id = id; // Update socket ID
         disconnectedPlayer.nickname = nickname;
         disconnectedPlayer.isDisconnected = false;
         
-        // Clear forfeit timer
-        if (this.disconnectTimers[disconnectedPlayer.id]) {
-          clearTimeout(this.disconnectTimers[disconnectedPlayer.id]);
-          delete this.disconnectTimers[disconnectedPlayer.id];
+        // Clear forfeit timer (stored under old socket ID)
+        if (this.disconnectTimers[oldId]) {
+          clearTimeout(this.disconnectTimers[oldId]);
+          delete this.disconnectTimers[oldId];
         }
         return true;
       }

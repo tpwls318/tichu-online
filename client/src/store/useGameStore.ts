@@ -72,7 +72,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socket.on('connect', () => {
       const { roomId, gameState } = get();
       if (roomId && gameState) {
-        // Try to rejoin previous room with saved nickname
         const nickname = localStorage.getItem('tichu_nickname') || 'Player';
         socket.emit('joinRoom', { nickname, roomId: gameState.roomId, userId: getUserId() });
       } else {

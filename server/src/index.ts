@@ -596,24 +596,13 @@ const start = async () => {
         for (const [roomId, engine] of allRooms) {
           const player = engine.state.players.find((p: any) => p.id === socket.id);
           if (player) {
-            // Bot room: delete entirely when human disconnects
-            const isBotRoom = engine.state.players.some(p => p.id.startsWith('bot'));
-            if (isBotRoom) {
-              engine.clearTurnTimer();
-              for (const timer of Object.values(engine.disconnectTimers)) {
-                clearTimeout(timer);
-              }
+            const remaining = engine.removePlayer(socket.id);
+            if (remaining === 0) {
               roomManager.removeRoom(roomId);
-              console.log(`Bot room ${roomId} removed because human player disconnected.`);
+              console.log(`Room ${roomId} removed as it is empty after disconnect.`);
             } else {
-              const remaining = engine.removePlayer(socket.id);
-              if (remaining === 0) {
-                roomManager.removeRoom(roomId);
-                console.log(`Room ${roomId} removed as it is empty after disconnect.`);
-              } else {
-                io.to(roomId).emit('gameStateUpdate', engine.state);
-                console.log(`Player ${socket.id} disconnected from room ${roomId}.`);
-              }
+              io.to(roomId).emit('gameStateUpdate', engine.state);
+              console.log(`Player ${socket.id} disconnected from room ${roomId}.`);
             }
             break;
           }
