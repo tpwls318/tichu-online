@@ -43,6 +43,8 @@ const start = async () => {
               console.log(`Auto-passing for player ${currentPlayer.nickname} (${currentPlayer.id}) in room ${roomId}`);
               engine.passTrick(currentPlayer.id);
               io.to(roomId).emit('gameStateUpdate', engine.state);
+              checkAndTriggerBotPlay(engine, roomId);
+              checkAndTriggerNewRound(engine, roomId);
             }
           }
         };
@@ -84,6 +86,10 @@ const start = async () => {
           console.log(`${nickname} joined room ${roomId}`);
           
           io.to(roomId).emit('gameStateUpdate', engine.state);
+          
+          // After reconnection, if it's a bot's turn, trigger bot play
+          checkAndTriggerBotPlay(engine, roomId);
+          checkAndTriggerNewRound(engine, roomId);
         } else {
           socket.emit('error', '방이 가득 찼습니다.');
         }

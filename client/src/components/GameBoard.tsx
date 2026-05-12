@@ -70,7 +70,16 @@ export const GameBoard: React.FC = () => {
   if (!gameState || !socket) return null;
 
   const me = gameState.players.find((p: any) => p.id === socket.id);
-  if (!me) return <div>소켓 연결 확인 중...</div>;
+  if (!me) return (
+    <div style={{ 
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      height: '100dvh', width: '100vw', backgroundColor: '#141E26', color: 'white', gap: '16px'
+    }}>
+      <div style={{ fontSize: '1.5rem', animation: 'pulse 1.5s ease-in-out infinite' }}>🔄</div>
+      <div style={{ fontSize: '1.1rem' }}>재연결 중...</div>
+      <style>{`@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
+    </div>
+  );
 
   // Initialize showReceived when data arrives (only once per PLAYING phase)
   useEffect(() => {
