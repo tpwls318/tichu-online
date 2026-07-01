@@ -714,6 +714,29 @@ export class TichuEngine {
         }
       }
 
+      // Collect any cards left in the active trick (so points like 5, 10, K, Dragon, Phoenix are not lost)
+      if (this.state.currentTrickCards.length > 0) {
+        let trickWinnerId = this.state.lastTrick?.playerId;
+        if (!trickWinnerId) {
+          trickWinnerId = this.finishedPlayers[2]; // Fallback: 3rd finisher
+        }
+        const trickWinner = this.state.players.find(p => p.id === trickWinnerId);
+        if (trickWinner) {
+          const isDragonTrick = this.state.currentTrickCards.some(c => c.value === 15);
+          if (isDragonTrick) {
+            // Dragon trick must be given to an opponent
+            const opposingTeam = trickWinner.team === 'A' ? 'B' : 'A';
+            const opponent = this.state.players.find(p => p.team === opposingTeam);
+            if (opponent) {
+              opponent.collectedCards.push(...this.state.currentTrickCards);
+            }
+          } else {
+            trickWinner.collectedCards.push(...this.state.currentTrickCards);
+          }
+        }
+        this.state.currentTrickCards = [];
+      }
+
       // Calculate final points from collected cards
       let teamAPoints = 0;
       let teamBPoints = 0;
