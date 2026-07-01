@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 import cors from '@fastify/cors';
 
 import { RoomManager } from './engine/roomManager.js';
+import { HandValidator } from './engine/validator.js';
 import { userStore } from './utils/userStore.js';
 
 const fastify = Fastify({
@@ -498,33 +499,191 @@ const start = async () => {
               // Free lead
               const dog = hand.find(c => c.value === 0);
               const sparrow = hand.find(c => c.value === 1);
-              
-              if (dog) {
-                tryPlay([dog.id]);
-              } else if (sparrow) {
-                const randomWish = Math.floor(Math.random() * 13) + 2; 
-                tryPlay([sparrow.id], randomWish);
-              } else {
-                const lowest = hand.find(c => c.value > 1) || hand[0];
-                if (lowest) tryPlay([lowest.id]);
+
+              // 50% probability to play a single card OR if there are no combinations
+              const playSingle = Math.random() < 0.5;
+
+              // Generate all combinations
+              const cardsByValue: Record<number, any[]> = {};
+              for (const card of hand) {
+                if (!cardsByValue[card.value]) {
+                  cardsByValue[card.value] = [];
+                }
+                cardsByValue[card.value].push(card);
               }
-            } else {
-              // Try to beat the trick
-              const partner = engine.state.players.find(p => p.team === currentPlayer.team && p.id !== currentPlayer.id);
-              const isPartnerWinningWithHighCard = partner && lastTrick.playerId === partner.id && lastTrick.value >= 10;
-              
-              if (!isPartnerWinningWithHighCard) {
-                if (lastTrick.type === 'Single') {
-                  const higherSingle = hand.find(c => c.value > lastTrick.value);
-                  if (higherSingle) tryPlay([higherSingle.id]);
-                } else if (lastTrick.type === 'Pair') {
-                  for (let i = 0; i < hand.length - 1; i++) {
-                    if (hand[i].value === hand[i+1].value && hand[i].value > lastTrick.value) {
-                      tryPlay([hand[i].id, hand[i+1].id]);
+
+              const pairs: any[][] = [];
+              const triples: any[][] = [];
+              for (const [valueStr, cards] of Object.entries(cardsByValue)) {
+                const val = Number(valueStr);
+                if (val >= 2 && val <= 14) {
+                  if (cards.length >= 2) pairs.push([cards[0], cards[1]]);
+                  if (cards.length >= 3) triples.push([cards[0], cards[1], cards[2]]);
+                }
+              }
+
+              const fullHouses: any[][] = [];
+              for (const t of triples) {
+                for (const p of pairs) {
+                  if (t[0].value !== p[0].value) {
+                    fullHouses.push([...t, ...p]);
+                  }
+                }
+              }
+
+              const uniqueValues = Array.from(new Set(hand.map(c => c.value)))
+                .filter(v => v === 1 || (v >= 2 && v <= 14))
+                .sort((a, b) => a - b);
+
+              const straights: any[][] = [];
+              for (let len = 5; len <= uniqueValues.length; len++) {
+                for (let i = 0; i <= uniqueValues.length - len; i++) {
+                  let isStraight = true;
+                  for (let j = 1; j < len; j++) {
+                    if (uniqueValues[i + j] !== uniqueValues[i + j - 1] + 1) {
+                      isStraight = false;
                       break;
                     }
                   }
+                  if (isStraight) {
+                    const straightCards = uniqueValues.slice(i, i + len).map(val => cardsByValue[val][0]);
+                    straights.push(straightCards);
+                  }
                 }
+              }
+
+              const cpPairs: any[][] = [];
+              const pairValues = Object.keys(cardsByValue)
+                .map(Number)
+                .filter(val => val >= 2 && val <= 14 && cardsByValue[val].length >= 2)
+                .sort((a, b) => a - b);
+
+              const consecutivePairs: any[][] = [];
+              for (let len = 2; len <= pairValues.length; len++) {
+                for (let i = 0; i <= pairValues.length - len; i++) {
+                  let isConsecutive = true;
+                  for (let j = 1; j < len; j++) {
+                    if (pairValues[i + j] !== pairValues[i + j - 1] + 1) {
+                      isConsecutive = false;
+                      break;
+                    }
+                  }
+                  if (isConsecutive) {
+                    const cpCards: any[] = [];
+                    for (let j = 0; j < len; j++) {
+                      const val = pairValues[i + j];
+                      cpCards.push(cardsByValue[val][0], cardsByValue[val][1]);
+                    }
+                    consecutivePairs.push(cpCards);
+                  }
+                }
+              }
+
+              const allCombos = [
+                ...pairs,
+                ...triples,
+                ...fullHouses,
+                ...straights,
+                ...consecutivePairs
+              ];
+
+              if (!playSingle && allCombos.length > 0) {
+                // Play a random combination
+                const chosenCombo = allCombos[Math.floor(Math.random() * allCombos.length)];
+                tryPlay(chosenCombo.map(c => c.id));
+              }
+
+              // Fallback to playing a single card
+              if (!played) {
+                if (dog) {
+                  tryPlay([dog.id]);
+                } else if (sparrow) {
+                  const randomWish = Math.floor(Math.random() * 13) + 2;
+                  tryPlay([sparrow.id], randomWish);
+                } else {
+                  const lowest = hand.find(c => c.value > 1) || hand[0];
+                  if (lowest) tryPlay([lowest.id]);
+                }
+              }
+            } else {
+              // Try to beat the trick
+              const requiredLength = lastTrick.cards.length;
+              const prevCombo = {
+                type: lastTrick.type as any,
+                value: lastTrick.value,
+                length: lastTrick.cards.length,
+                cards: lastTrick.cards
+              };
+
+              const getSubsets = (arr: any[], len: number): any[][] => {
+                const res: any[][] = [];
+                const fork = (idx: number, cur: any[]) => {
+                  if (cur.length === len) {
+                    res.push(cur);
+                    return;
+                  }
+                  if (idx >= arr.length) return;
+                  fork(idx + 1, [...cur, arr[idx]]);
+                  fork(idx + 1, cur);
+                };
+                fork(0, []);
+                return res;
+              };
+
+              const validPlays: any[][] = [];
+
+              // 1. Check all subsets of matching length
+              const subsets = getSubsets(hand, requiredLength);
+              for (const subset of subsets) {
+                const result = HandValidator.validate(subset);
+                if (result.type !== 'Invalid' && HandValidator.compare(prevCombo, result)) {
+                  validPlays.push(subset);
+                }
+              }
+
+              // 2. Check for Quartets (Quartet Bomb)
+              const cardsByValue: Record<number, any[]> = {};
+              for (const card of hand) {
+                if (!cardsByValue[card.value]) cardsByValue[card.value] = [];
+                cardsByValue[card.value].push(card);
+              }
+
+              for (const [valStr, cards] of Object.entries(cardsByValue)) {
+                if (cards.length === 4) {
+                  const result = HandValidator.validate(cards);
+                  if (result.type !== 'Invalid' && HandValidator.compare(prevCombo, result)) {
+                    validPlays.push(cards);
+                  }
+                }
+              }
+
+              // 3. Check for Straight Flushes (Straight Flush Bomb)
+              const suits = ['Jade', 'Sword', 'Pagoda', 'Star'];
+              for (const suit of suits) {
+                const suitCards = hand.filter(c => c.suit === suit);
+                for (let len = 5; len <= Math.min(suitCards.length, 14); len++) {
+                  const suitSubsets = getSubsets(suitCards, len);
+                  for (const subset of suitSubsets) {
+                    const result = HandValidator.validate(subset);
+                    if (result.type === 'BombStraightFlush' && HandValidator.compare(prevCombo, result)) {
+                      validPlays.push(subset);
+                    }
+                  }
+                }
+              }
+
+              // Apply K/A 20% rule
+              const allowedPlays = validPlays.filter(play => {
+                const hasKOrA = play.some(c => c.value === 13 || c.value === 14);
+                if (hasKOrA) {
+                  return Math.random() < 0.2;
+                }
+                return true;
+              });
+
+              if (allowedPlays.length > 0) {
+                const chosenPlay = allowedPlays[Math.floor(Math.random() * allowedPlays.length)];
+                tryPlay(chosenPlay.map(c => c.id));
               }
             }
           }
