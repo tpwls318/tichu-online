@@ -3,12 +3,29 @@ import { Server } from 'socket.io';
 import cors from '@fastify/cors';
 
 import { RoomManager } from './engine/roomManager.js';
+import { userStore } from './utils/userStore.js';
 
 const fastify = Fastify({
   logger: true
 });
 
 const roomManager = new RoomManager();
+
+const recordGameResults = (engine: any, winningTeam: 'A' | 'B') => {
+  if (!engine || engine.resultsRecorded) return;
+  engine.resultsRecorded = true;
+
+  engine.state.players.forEach((p: any) => {
+    if (p.id.startsWith('bot') || !p.userId) return;
+    if (p.team === winningTeam) {
+      userStore.addWin(p.userId);
+      console.log(`Recorded Win for user: ${p.userId}`);
+    } else {
+      userStore.addLoss(p.userId);
+      console.log(`Recorded Loss for user: ${p.userId}`);
+    }
+  });
+};
 
 fastify.register(cors, {
   origin: '*'
@@ -51,6 +68,14 @@ const start = async () => {
         engine.onGameEnd = () => {
           console.log(`Game ended due to forfeit in room ${roomId}`);
           io.to(roomId).emit('gameStateUpdate', engine.state);
+
+          // Forfeit: Find disconnected player and record win/loss
+          const disconnectedPlayer = engine.state.players.find(p => p.isDisconnected);
+          if (disconnectedPlayer) {
+            const losingTeam = disconnectedPlayer.team;
+            const winningTeam = losingTeam === 'A' ? 'B' : 'A';
+            recordGameResults(engine, winningTeam);
+          }
           
           // Clear all turn timers and disconnect timers
           engine.clearTurnTimer();
@@ -66,6 +91,55 @@ const start = async () => {
           }
         };
       };
+
+      // User authentication handlers
+      socket.on('register', ({ username, password, nickname }) => {
+        const result = userStore.registerUser(username, password, nickname);
+        if (result.success) {
+          // Auto-login upon successful registration
+          const authResult = userStore.authenticateUser(username, password);
+          if (authResult.success && authResult.user) {
+            socket.emit('loginSuccess', { 
+              userId: authResult.user.username, 
+              nickname: authResult.user.nickname,
+              wins: authResult.user.wins,
+              losses: authResult.user.losses,
+              message: '회원가입 및 로그인이 완료되었습니다.' 
+            });
+          } else {
+            socket.emit('registerSuccess', { message: result.message });
+          }
+        } else {
+          socket.emit('registerFailed', { message: result.message });
+        }
+      });
+
+      socket.on('login', ({ username, password }) => {
+        const result = userStore.authenticateUser(username, password);
+        if (result.success && result.user) {
+          socket.emit('loginSuccess', { 
+            userId: result.user.username, 
+            nickname: result.user.nickname,
+            wins: result.user.wins,
+            losses: result.user.losses,
+            message: result.message 
+          });
+        } else {
+          socket.emit('loginFailed', { message: result.message });
+        }
+      });
+
+      socket.on('getUserStats', ({ userId }) => {
+        if (!userId) return;
+        const stats = userStore.getUserStats(userId);
+        if (stats) {
+          socket.emit('userStatsUpdate', {
+            userId,
+            wins: stats.wins,
+            losses: stats.losses
+          });
+        }
+      });
 
       socket.on('createRoom', ({ nickname, settings, userId }) => {
         const roomName = `${nickname}의 방`;
@@ -192,14 +266,19 @@ const start = async () => {
         }
       };
 
-      // 라운드 종료 후 5초 뒤 자동으로 다음 라운드 시작
       const checkAndTriggerNewRound = (engine: ReturnType<RoomManager['getRoom']>, roomId: string) => {
         if (!engine || engine.state.phase !== 'FINISHED') return;
+
+        const targetScore = engine.state.settings?.targetScore || 1000;
+        if (engine.state.scores.teamA >= targetScore) {
+          recordGameResults(engine, 'A');
+        } else if (engine.state.scores.teamB >= targetScore) {
+          recordGameResults(engine, 'B');
+        }
 
         setTimeout(() => {
           if (!engine || engine.state.phase !== 'FINISHED') return;
           
-          const targetScore = engine.state.settings?.targetScore || 1000;
           if (engine.state.scores.teamA >= targetScore) {
             engine.state.roundResult!.message = `🏆 A팀이 ${targetScore}점을 달성하여 최종 승리했습니다!`;
             io.to(roomId).emit('gameStateUpdate', engine.state);

@@ -11,9 +11,15 @@ interface GameStore {
   error: string | null;
   needsNickname: boolean;
   roomList: any[];
+  isAuthenticated: boolean;
+  authError: string | null;
+  authSuccess: string | null;
+  wins: number;
+  losses: number;
   setNeedsNickname: (val: boolean) => void;
   connect: () => void;
   getRooms: () => void;
+  getUserStats: () => void;
   createRoom: (nickname: string, settings?: { targetScore: number, timeLimit: number }) => void;
   joinRoom: (nickname: string, roomId: string) => void;
   updateNickname: (newNickname: string) => void;
@@ -28,6 +34,10 @@ interface GameStore {
   returnToWaitingRoom: () => void;
   playAgain: () => void;
   leaveRoom: () => void;
+  login: (username: string, password: string) => void;
+  register: (username: string, password: string, nickname: string) => void;
+  logout: () => void;
+  clearAuthMessages: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -37,11 +47,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
   error: null,
   needsNickname: false,
   roomList: [],
+  isAuthenticated: typeof window !== 'undefined' ? !!localStorage.getItem('tichu_user_id') : false,
+  authError: null,
+  authSuccess: null,
+  wins: 0,
+  losses: 0,
 
   setNeedsNickname: (val: boolean) => set({ needsNickname: val }),
 
   getRooms: () => {
     get().socket?.emit('getRooms');
+  },
+
+  getUserStats: () => {
+    const userId = localStorage.getItem('tichu_user_id');
+    if (userId) {
+      get().socket?.emit('getUserStats', { userId });
+    }
   },
 
   connect: () => {
@@ -70,12 +92,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // When socket reconnects, try to rejoin previous room
     socket.on('connect', () => {
+      const myId = localStorage.getItem('tichu_user_id');
+      if (myId) {
+        socket.emit('getUserStats', { userId: myId });
+      }
+
       const { roomId, gameState } = get();
       if (roomId && gameState) {
         const nickname = localStorage.getItem('tichu_nickname') || 'Player';
         socket.emit('joinRoom', { nickname, roomId: gameState.roomId, userId: getUserId() });
       } else {
         socket.emit('getRooms');
+      }
+    });
+
+    socket.on('userStatsUpdate', ({ userId, wins, losses }) => {
+      const myId = localStorage.getItem('tichu_user_id');
+      if (myId === userId) {
+        set({ wins: wins || 0, losses: losses || 0 });
       }
     });
 
@@ -87,6 +121,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       } else {
         set({ error: msg });
       }
+    });
+
+    socket.on('loginSuccess', ({ userId, nickname, wins, losses, message }) => {
+      localStorage.setItem('tichu_user_id', userId);
+      localStorage.setItem('tichu_nickname', nickname);
+      set({ isAuthenticated: true, authError: null, authSuccess: message, wins: wins || 0, losses: losses || 0 });
+      socket.emit('getRooms');
+    });
+
+    socket.on('loginFailed', ({ message }) => {
+      set({ authError: message, authSuccess: null, isAuthenticated: false });
+    });
+
+    socket.on('registerSuccess', ({ message }) => {
+      set({ authSuccess: message, authError: null });
+    });
+
+    socket.on('registerFailed', ({ message }) => {
+      set({ authError: message, authSuccess: null });
     });
 
     // Listen for mobile browser tab switching back to visibility
@@ -200,5 +253,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
     set({ gameState: null, roomId: null });
     get().socket?.emit('getRooms');
+  },
+
+  login: (username, password) => {
+    get().socket?.emit('login', { username, password });
+  },
+
+  register: (username, password, nickname) => {
+    get().socket?.emit('register', { username, password, nickname });
+  },
+
+  logout: () => {
+    localStorage.removeItem('tichu_user_id');
+    localStorage.removeItem('tichu_nickname');
+    set({ isAuthenticated: false, authError: null, authSuccess: null, gameState: null, roomId: null, wins: 0, losses: 0 });
+  },
+
+  clearAuthMessages: () => {
+    set({ authError: null, authSuccess: null });
   }
 }));
